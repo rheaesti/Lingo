@@ -18,7 +18,7 @@ export default function UsersPage() {
       router.push('/')
       return
     }
-    
+
     setCurrentUser(username)
 
     // Initialize socket connection
@@ -41,14 +41,14 @@ export default function UsersPage() {
       const filteredUsers = usersList
         .filter(username => username !== currentUser)
         .filter((username, index, arr) => arr.indexOf(username) === index)
-      
+
       setUsers(filteredUsers)
     })
 
     socket.on('user_joined', (username) => {
       // Only add if it's not the current user and not already in the list
       if (username !== currentUser && !users.includes(username)) {
-        setUsers(prev => [...prev, username])
+        //setUsers(prev => [...prev, username])
       }
     })
 
@@ -80,7 +80,7 @@ export default function UsersPage() {
       <Head>
         <title>Online Users - ChitChat</title>
       </Head>
-      
+
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 shadow-sm">
@@ -100,7 +100,7 @@ export default function UsersPage() {
                   </p>
                 </div>
               </div>
-              
+
               <button
                 onClick={handleLogout}
                 className="px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors font-medium"
@@ -175,8 +175,8 @@ export default function UsersPage() {
           {/* Connection Status */}
           <div className="mt-12 text-center">
             <div className={`inline-flex items-center px-4 py-2 rounded-md ${
-              isConnected 
-                ? 'bg-green-100 text-green-800' 
+              isConnected
+                ? 'bg-green-100 text-green-800'
                 : 'bg-red-100 text-red-800'
             }`}>
               <div className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
