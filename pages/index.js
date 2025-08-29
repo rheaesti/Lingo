@@ -31,11 +31,26 @@ export default function LoginPage() {
     setError('')
 
     // Initialize socket connection
-    socket = io('http://localhost:5000')
+    socket = io('http://localhost:5000', { timeout: 3000, reconnectionAttempts: 2 })
+
+    // Connection error handlers
+    socket.on('connect_error', (err) => {
+      console.error('Socket connect_error:', err?.message || err)
+      setError('Cannot reach server at http://localhost:5000')
+      setIsLoading(false)
+      socket.disconnect()
+    })
+    socket.on('connect_timeout', () => {
+      setError('Server connection timed out')
+      setIsLoading(false)
+      socket.disconnect()
+    })
 
     // Emit login event
     socket.on('login_success', (loggedInUsername) => {
       localStorage.setItem('username', loggedInUsername)
+      // Proactively close this socket to avoid duplicate sessions
+      try { socket.disconnect() } catch {}
       router.push('/users')
     })
 

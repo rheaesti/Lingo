@@ -24,36 +24,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Load chat history from localStorage
-  const loadChatHistory = (fromUser, toUser) => {
-    const historyKey = `chat_${fromUser}_${toUser}`
-    const reverseKey = `chat_${toUser}_${fromUser}`
-    
-    // Try both directions for chat history
-    let history = JSON.parse(localStorage.getItem(historyKey) || '[]')
-    const reverseHistory = JSON.parse(localStorage.getItem(reverseKey) || '[]')
-    
-    // Combine and sort by timestamp
-    const allMessages = [...history, ...reverseHistory]
-      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-      .map(msg => ({
-        ...msg,
-        type: msg.from === fromUser ? 'sent' : 'received'
-      }))
-    
-    setMessages(allMessages)
-    setChatHistory(allMessages)
-  }
-
-  // Save message to localStorage
-  const saveMessageToHistory = (message) => {
-    const { from, to, message: msgText, timestamp } = message
-    const historyKey = `chat_${from}_${to}`
-    
-    let history = JSON.parse(localStorage.getItem(historyKey) || '[]')
-    history.push({ from, to, message: msgText, timestamp })
-    localStorage.setItem(historyKey, JSON.stringify(history))
-  }
+  // DB-backed history is fetched from the server via Socket.IO
 
   useEffect(() => {
     scrollToBottom()
@@ -71,14 +42,14 @@ export default function ChatPage() {
     
     setCurrentUser(username)
 
-    // Load chat history first
-    loadChatHistory(username, chatPartner)
-
-    // Initialize socket connection
+    // Fetch chat history from server (DB)
+    // Server emits 'chat_history' with normalized records
     socket = io('http://localhost:5000')
 
     // Re-login with the stored username (this will handle duplicate connections)
     socket.emit('user_login', username)
+    // Request history once logged in
+    socket.emit('fetch_history', { with: chatPartner, for: username })
 
     // Socket event listeners
     socket.on('connect', () => {
@@ -97,14 +68,6 @@ export default function ChatPage() {
         }
         
         setMessages(prev => [...prev, messageData])
-        
-        // Save to chat history
-        saveMessageToHistory({
-          from: data.from,
-          to: currentUser,
-          message: data.message,
-          timestamp: data.timestamp
-        })
         
         // If this is an offline message, show a notification
         if (data.type === 'offline') {
@@ -125,14 +88,13 @@ export default function ChatPage() {
         }
         
         setMessages(prev => [...prev, messageData])
-        
-        // Save to chat history
-        saveMessageToHistory({
-          from: currentUser,
-          to: data.to,
-          message: data.message,
-          timestamp: data.timestamp
-        })
+      }
+    })
+
+    // Receive DB chat history
+    socket.on('chat_history', (payload) => {
+      if (payload.with === chatPartner && Array.isArray(payload.messages)) {
+        setMessages(payload.messages)
       }
     })
 
@@ -222,12 +184,7 @@ export default function ChatPage() {
   }
 
   const clearChatHistory = () => {
-    const historyKey = `chat_${currentUser}_${chatPartner}`
-    const reverseKey = `chat_${chatPartner}_${currentUser}`
-    
-    localStorage.removeItem(historyKey)
-    localStorage.removeItem(reverseKey)
-    
+    // Local UI clear only (does not delete DB records)
     setMessages([])
     setChatHistory([])
   }
