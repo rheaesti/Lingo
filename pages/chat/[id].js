@@ -196,6 +196,7 @@ export default function ChatPage() {
     })
   }
 
+
   if (!chatPartner) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -318,7 +319,18 @@ export default function ChatPage() {
                         ? 'bg-blue-600 text-white' 
                         : 'bg-white text-gray-800 border border-gray-200'
                     }`}>
-                      <p className="text-sm leading-relaxed">{message.message}</p>
+                      <p className="text-sm leading-relaxed">
+                        {message.message}
+                      </p>
+                      {message.isTranslated && message.type === 'received' && (
+                        <p className={`text-xs mt-1 italic ${
+                          message.type === 'sent' 
+                            ? 'text-blue-200' 
+                            : 'text-gray-400'
+                        }`}>
+                          🔄 Auto-translated from {message.originalLanguage} to {message.translatedLanguage}
+                        </p>
+                      )}
                       <p className={`text-xs mt-2 ${
                         message.type === 'sent' 
                           ? 'text-blue-100' 

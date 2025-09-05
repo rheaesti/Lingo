@@ -295,31 +295,67 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Find the recipient's socket
+    // Find the recipient's socket and get their language preference
     let recipientSocket = null;
+    let recipientLanguage = 'English'; // Default language
     for (const [socketId, info] of connectedUsers.entries()) {
       if (info.username === to && socketId !== socket.id) {
         recipientSocket = socketId;
+        recipientLanguage = info.preferredLanguage || 'English';
         break;
       }
     }
 
+    // Get sender's language preference
+    const senderLanguage = sender?.preferredLanguage || 'English';
+
     if (recipientSocket) {
-      // Send message to recipient (online)
+      // Auto-translate message for recipient if languages are different
+      let translatedMessage = message;
+      if (senderLanguage !== recipientLanguage) {
+        try {
+          const translationResponse = await fetch('http://localhost:5000/translate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: message,
+              sourceLanguage: senderLanguage,
+              targetLanguage: recipientLanguage
+            })
+          });
+
+          if (translationResponse.ok) {
+            const translationResult = await translationResponse.json();
+            translatedMessage = translationResult.translatedText;
+            console.log(`Auto-translated message from ${senderLanguage} to ${recipientLanguage}: ${message} -> ${translatedMessage}`);
+          }
+        } catch (error) {
+          console.error('Auto-translation failed:', error);
+          // Continue with original message if translation fails
+        }
+      }
+
+      // Send translated message to recipient (online)
       io.to(recipientSocket).emit('private_message', {
         from,
-        message,
+        message: translatedMessage,
+        originalMessage: message,
+        originalLanguage: senderLanguage,
+        translatedLanguage: recipientLanguage,
+        isTranslated: senderLanguage !== recipientLanguage,
         timestamp: persisted.created_at || new Date().toISOString()
       });
 
-      // Send confirmation to sender
+      // Send confirmation to sender (original message)
       socket.emit('message_sent', {
         to,
         message,
         timestamp: persisted.created_at || new Date().toISOString()
       });
 
-      console.log(`Message sent from ${from} to ${to} (online)`);
+      console.log(`Message sent from ${from} to ${to} (online) - Auto-translated: ${senderLanguage} -> ${recipientLanguage}`);
     } else {
       // Recipient offline: confirmation to sender; message already persisted in DB
       socket.emit('message_sent', {
@@ -341,11 +377,55 @@ io.on('connection', (socket) => {
     const room = await getOrCreateChatRoom(me.userId, other.id);
     if (!room?.id) return;
     const rows = await getMessages(room.id);
-    const history = rows.map(r => ({
-      message: r.content,
-      timestamp: r.created_at,
-      type: r.sender_id === me.userId ? 'sent' : 'received'
+    
+    // Get current user's language preference
+    const currentUserLanguage = me.preferredLanguage || 'English';
+    const otherUserLanguage = await getLanguagePreference(other.id);
+    
+    const history = await Promise.all(rows.map(async (r) => {
+      const isReceived = r.sender_id !== me.userId;
+      let message = r.content;
+      let isTranslated = false;
+      let originalLanguage = currentUserLanguage;
+      let translatedLanguage = currentUserLanguage;
+      
+      // If it's a received message and languages are different, translate it
+      if (isReceived && currentUserLanguage !== otherUserLanguage) {
+        try {
+          const translationResponse = await fetch('http://localhost:5000/translate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: r.content,
+              sourceLanguage: otherUserLanguage,
+              targetLanguage: currentUserLanguage
+            })
+          });
+
+          if (translationResponse.ok) {
+            const translationResult = await translationResponse.json();
+            message = translationResult.translatedText;
+            isTranslated = true;
+            originalLanguage = otherUserLanguage;
+            translatedLanguage = currentUserLanguage;
+          }
+        } catch (error) {
+          console.error('History translation failed:', error);
+        }
+      }
+      
+      return {
+        message: message,
+        timestamp: r.created_at,
+        type: isReceived ? 'received' : 'sent',
+        isTranslated: isTranslated,
+        originalLanguage: originalLanguage,
+        translatedLanguage: translatedLanguage
+      };
     }));
+    
     socket.emit('chat_history', { with: otherUsername, messages: history });
   });
 
@@ -443,6 +523,46 @@ app.get('/db-check', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     res.status(502).json({ ok: false, reason: 'Fetch failed', error: String(e) });
+  }
+});
+
+// Translation endpoint using Sarvam-Translate
+app.post('/translate', async (req, res) => {
+  try {
+    const { text, targetLanguage, sourceLanguage = 'auto' } = req.body;
+    
+    if (!text || !targetLanguage) {
+      return res.status(400).json({ error: 'Text and target language are required' });
+    }
+
+    // Call Sarvam-Translate API directly
+    const response = await fetch('https://api.sarvam.ai/translate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer sk_wsi7w8tb_It8xiqE4fdrxA44Bb0lbxjVg`
+      },
+      body: JSON.stringify({
+        text: text,
+        source_language: sourceLanguage,
+        target_language: targetLanguage
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Translation API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    res.json({ 
+      translatedText: result.translated_text || result.text || 'Translation failed',
+      sourceLanguage: result.source_language || sourceLanguage,
+      targetLanguage: result.target_language || targetLanguage
+    });
+
+  } catch (error) {
+    console.error('Translation error:', error);
+    res.status(500).json({ error: 'Translation failed' });
   }
 });
 
