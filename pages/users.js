@@ -78,7 +78,7 @@ export default function UsersPage() {
   return (
     <>
       <Head>
-        <title>Online Users - ChitChat</title>
+        <title>Online Users - Lingo</title>
       </Head>
 
       <div className="min-h-screen bg-gray-50">

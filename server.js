@@ -30,7 +30,7 @@ if (!supabase) {
 }
 
 // Helpers for DB operations
-async function getOrCreateUser(username) {
+async function getOrCreateUser(username, preferredLanguage = 'English') {
   if (!supabase) return null;
   // Try to find existing user
   let { data: user, error } = await supabase
@@ -53,15 +53,22 @@ async function getOrCreateUser(username) {
       console.error('getOrCreateUser: insert error', insertErr);
       return null;
     }
-    return inserted;
+    user = inserted;
   } else {
     // Mark online
     await supabase
       .from('users')
-      .update({ is_online: true, last_seen: new Date().toISOString() })
+      .update({ 
+        is_online: true, 
+        last_seen: new Date().toISOString()
+      })
       .eq('id', user.id);
-    return user;
   }
+
+  // Store/update language preference in language_preferences table
+  await storeLanguagePreference(user.id, preferredLanguage);
+  
+  return user;
 }
 
 async function getUserByUsername(username) {
@@ -131,6 +138,69 @@ async function getMessages(chat_room_id) {
   return data || [];
 }
 
+async function storeLanguagePreference(userId, language) {
+  if (!supabase) return null;
+  
+  // Check if user already has a language preference
+  const { data: existing, error: selectError } = await supabase
+    .from('language_preferences')
+    .select('id, language')
+    .eq('user_id', userId)
+    .single();
+
+  if (selectError && selectError.code !== 'PGRST116') {
+    console.error('storeLanguagePreference: select error', selectError);
+  }
+
+  if (existing) {
+    // Update existing preference
+    const { error: updateError } = await supabase
+      .from('language_preferences')
+      .update({ 
+        language: language,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId);
+    
+    if (updateError) {
+      console.error('storeLanguagePreference: update error', updateError);
+    }
+  } else {
+    // Insert new preference
+    const { error: insertError } = await supabase
+      .from('language_preferences')
+      .insert({ 
+        user_id: userId, 
+        language: language,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    
+    if (insertError) {
+      console.error('storeLanguagePreference: insert error', insertError);
+    }
+  }
+}
+
+async function getLanguagePreference(userId) {
+  if (!supabase) return 'English';
+  
+  const { data, error } = await supabase
+    .from('language_preferences')
+    .select('language')
+    .eq('user_id', userId)
+    .single();
+  
+  if (error) {
+    if (error.code !== 'PGRST116') {
+      console.error('getLanguagePreference error', error);
+    }
+    return 'English'; // Default language
+  }
+  
+  return data?.language || 'English';
+}
+
 // Store connected users in memory (socket.id -> { username, userId })
 const connectedUsers = new Map();
 const usernames = new Set();
@@ -144,7 +214,10 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   // Handle user login
-  socket.on('user_login', async (username) => {
+  socket.on('user_login', async (data) => {
+    const username = typeof data === 'string' ? data : data.username;
+    const preferredLanguage = typeof data === 'object' ? data.preferredLanguage : 'English';
+    
     // If username already connected on another socket, drop the old mapping (prefer latest connection)
     for (const [id, info] of Array.from(connectedUsers.entries())) {
       if (info.username === username && id !== socket.id) {
@@ -161,14 +234,14 @@ io.on('connection', (socket) => {
     }
 
     // Ensure user exists in DB and mark online
-    let userRecord = await getOrCreateUser(username);
+    let userRecord = await getOrCreateUser(username, preferredLanguage);
     const userId = userRecord?.id || null;
     if (userId) {
       usernameToUserId.set(username, userId);
     }
 
     // Store user information
-    connectedUsers.set(socket.id, { username, userId });
+    connectedUsers.set(socket.id, { username, userId, preferredLanguage });
     usernames.add(username);
 
     // Emit login success
@@ -185,7 +258,7 @@ io.on('connection', (socket) => {
       socket.broadcast.emit('user_joined', username);
     }
 
-    console.log(`User ${username} logged in on socket ${socket.id}`);
+    console.log(`User ${username} logged in on socket ${socket.id} with language preference: ${preferredLanguage}`);
   });
 
   // Handle private messages

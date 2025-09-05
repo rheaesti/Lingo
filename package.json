@@ -1,5 +1,5 @@
 {
-  "name": "chitchat-app",
+  "name": "lingo-app",
   "version": "1.0.0",
   "description": "Real-time chatting webapp with Next.js frontend and Node.js backend",
   "scripts": {

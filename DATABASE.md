@@ -34,7 +34,29 @@ Stores user account information.
 
 ---
 
-## **2. `user_sessions`**
+## **2. `language_preferences`**
+
+Stores user language preferences for the chat interface.
+
+| Column       | Type                      | Description                                                      |
+| ------------ | ------------------------- | ---------------------------------------------------------------- |
+| `id`         | `uuid` (PK)               | Unique identifier for the preference. Defaults to `gen_random_uuid()`. |
+| `user_id`    | `uuid` (FK → users.id)    | References the user who has this language preference.           |
+| `language`   | `varchar(50)`             | The preferred language (e.g., 'English', 'Hindi', 'Tamil').     |
+| `created_at` | `timestamptz`             | Timestamp when the preference was created. Defaults to `now()`.  |
+| `updated_at` | `timestamptz`             | Timestamp of the last update. Auto-updated via trigger.          |
+
+**Indexes & Constraints:**
+
+* `language_preferences_pkey` → Primary Key on `id`.
+* Foreign key `user_id` → ensures preference belongs to a valid user.
+* Unique constraint on `user_id` → one language preference per user.
+* Index on `user_id` for quick lookups.
+* Index on `language` for language-based queries.
+
+---
+
+## **3. `user_sessions`**
 
 Tracks active user sessions (e.g., web or mobile logins).
 
@@ -59,7 +81,7 @@ Tracks active user sessions (e.g., web or mobile logins).
 
 ---
 
-## **3. `chat_rooms`**
+## **4. `chat_rooms`**
 
 Represents 1-on-1 private chat rooms between two users.
 
@@ -79,7 +101,7 @@ Represents 1-on-1 private chat rooms between two users.
 
 ---
 
-## **4. `messages`**
+## **5. `messages`**
 
 Stores all messages exchanged in chat rooms.
 

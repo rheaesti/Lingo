@@ -210,7 +210,7 @@ export default function ChatPage() {
   return (
     <>
       <Head>
-        <title>Chat with {chatPartner} - ChitChat</title>
+        <title>Chat with {chatPartner} - Lingo</title>
       </Head>
       
       <div className="min-h-screen bg-gray-50 flex flex-col">

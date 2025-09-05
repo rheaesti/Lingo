@@ -8,12 +8,17 @@ let socket
 export default function LoginPage() {
   const router = useRouter()
   const [username, setUsername] = useState('')
+  const [selectedLanguage, setSelectedLanguage] = useState('English')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     // Check if user is already logged in
     const storedUsername = localStorage.getItem('username')
+    const storedLanguage = localStorage.getItem('selectedLanguage')
+    if (storedLanguage) {
+      setSelectedLanguage(storedLanguage)
+    }
     if (storedUsername) {
       router.push('/users')
     }
@@ -49,6 +54,7 @@ export default function LoginPage() {
     // Emit login event
     socket.on('login_success', (loggedInUsername) => {
       localStorage.setItem('username', loggedInUsername)
+      localStorage.setItem('selectedLanguage', selectedLanguage)
       // Proactively close this socket to avoid duplicate sessions
       try { socket.disconnect() } catch {}
       router.push('/users')
@@ -62,13 +68,16 @@ export default function LoginPage() {
       }
     })
 
-    socket.emit('user_login', username.trim())
+    socket.emit('user_login', {
+      username: username.trim(),
+      preferredLanguage: selectedLanguage
+    })
   }
 
   return (
     <>
       <Head>
-        <title>Login - ChitChat</title>
+        <title>Login - Lingo</title>
       </Head>
       
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -80,7 +89,7 @@ export default function LoginPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">ChitChat</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Lingo</h1>
             <p className="text-gray-600">Connect with friends in real-time</p>
           </div>
 
@@ -100,6 +109,43 @@ export default function LoginPage() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   disabled={isLoading}
                 />
+              </div>
+
+              <div>
+                <label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-2">
+                  Select your preferred language
+                </label>
+                <select
+                  id="language"
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  disabled={isLoading}
+                >
+                  <option value="Assamese">Assamese</option>
+                  <option value="Bengali">Bengali</option>
+                  <option value="Bodo">Bodo</option>
+                  <option value="Dogri">Dogri</option>
+                  <option value="Gujarati">Gujarati</option>
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Kannada">Kannada</option>
+                  <option value="Kashmiri">Kashmiri</option>
+                  <option value="Konkani">Konkani</option>
+                  <option value="Maithili">Maithili</option>
+                  <option value="Malayalam">Malayalam</option>
+                  <option value="Manipuri">Manipuri</option>
+                  <option value="Marathi">Marathi</option>
+                  <option value="Nepali">Nepali</option>
+                  <option value="Odia">Odia</option>
+                  <option value="Punjabi">Punjabi</option>
+                  <option value="Sanskrit">Sanskrit</option>
+                  <option value="Santali">Santali</option>
+                  <option value="Sindhi">Sindhi</option>
+                  <option value="Tamil">Tamil</option>
+                  <option value="Telugu">Telugu</option>
+                  <option value="Urdu">Urdu</option>
+                </select>
               </div>
 
               {error && (
@@ -137,6 +183,12 @@ export default function LoginPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   Real-time messaging
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Multi-language support (22 Indian languages)
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

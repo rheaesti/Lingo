@@ -1,4 +1,4 @@
-# Sincha Chat App
+# Lingo Chat App
 
 A real-time chatting webapp built with Next.js (frontend) and Node.js with Socket.IO (backend).
 
@@ -23,14 +23,16 @@ A real-time chatting webapp built with Next.js (frontend) and Node.js with Socke
 - **Node.js** - JavaScript runtime
 - **Express.js** - Web framework
 - **Socket.IO** - Real-time bidirectional communication
+- **Supabase** - PostgreSQL database with real-time features
 - **CORS** - Cross-origin resource sharing
 
 ## Project Structure
 
 ```
-sincha/
-├── server.js              # Backend server (Node.js + Express + Socket.IO)
+lingo/
+├── server.js              # Backend server (Node.js + Express + Socket.IO + Supabase)
 ├── package.json           # Dependencies and scripts
+├── .env                   # Environment variables (Supabase credentials)
 ├── next.config.js         # Next.js configuration
 ├── tailwind.config.js     # TailwindCSS configuration
 ├── postcss.config.js      # PostCSS configuration
@@ -43,6 +45,7 @@ sincha/
 │   ├── users.js          # Online users list page
 │   └── chat/
 │       └── [id].js       # Individual chat page
+├── DATABASE.md           # Database schema documentation
 └── README.md             # This file
 ```
 
@@ -52,13 +55,14 @@ sincha/
 
 - Node.js (v16 or higher)
 - npm or yarn
+- Supabase account and project
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd sincha
+   cd lingo
    ```
 
 2. **Install dependencies**
@@ -66,7 +70,21 @@ sincha/
    npm install
    ```
 
-3. **Start the development servers**
+3. **Set up Supabase**
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Copy your project URL and service role key
+   - Create a `.env` file with your credentials:
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   PORT=5000
+   ```
+
+4. **Set up the database**
+   - Go to your Supabase dashboard → SQL Editor
+   - Run the SQL commands from `DATABASE.md` to create the required tables
+
+5. **Start the development servers**
    ```bash
    npm run dev
    ```
@@ -122,8 +140,9 @@ sincha/
 
 ### Real-time Communication
 - Messages are delivered instantly using Socket.IO
-- No message persistence (messages are lost on page refresh)
+- Message persistence with Supabase PostgreSQL database
 - Typing indicators show when someone is composing a message
+- Chat history is automatically saved and retrieved
 
 ### User Management
 - Usernames must be unique across all connected users
