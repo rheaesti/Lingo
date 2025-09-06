@@ -1,4 +1,5 @@
 import '../styles/globals.css'
+import '../styles/virtual-keyboard.css'
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
 

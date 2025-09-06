@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import io from 'socket.io-client'
+import VirtualKeyboard from '../../components/VirtualKeyboard'
 
 let socket
 
@@ -16,9 +17,12 @@ export default function ChatPage() {
   const [typingUsers, setTypingUsers] = useState(new Set())
   const [isConnected, setIsConnected] = useState(false)
   const [chatHistory, setChatHistory] = useState([])
+  const [selectedLanguage, setSelectedLanguage] = useState('English')
+  const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false)
   
   const messagesEndRef = useRef(null)
   const typingTimeoutRef = useRef(null)
+  const messageInputRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -33,6 +37,7 @@ export default function ChatPage() {
   useEffect(() => {
     // Get current user from localStorage
     const username = localStorage.getItem('username')
+    const language = localStorage.getItem('selectedLanguage')
     if (!username) {
       router.push('/')
       return
@@ -41,6 +46,9 @@ export default function ChatPage() {
     if (!chatPartner) return
     
     setCurrentUser(username)
+    if (language) {
+      setSelectedLanguage(language)
+    }
 
     // Fetch chat history from server (DB)
     // Server emits 'chat_history' with normalized records
@@ -187,6 +195,23 @@ export default function ChatPage() {
     // Local UI clear only (does not delete DB records)
     setMessages([])
     setChatHistory([])
+  }
+
+  const handleVirtualKeyboardInput = (input) => {
+    setNewMessage(input)
+    if (messageInputRef.current) {
+      messageInputRef.current.value = input
+    }
+  }
+
+  const handleVirtualKeyboardKeyPress = (button) => {
+    if (button === '{enter}') {
+      handleSendMessage()
+    }
+  }
+
+  const toggleVirtualKeyboard = () => {
+    setShowVirtualKeyboard(!showVirtualKeyboard)
   }
 
   const formatTime = (timestamp) => {
@@ -367,17 +392,19 @@ export default function ChatPage() {
         </div>
 
         {/* Message Input */}
-        <div className="bg-white border-t border-gray-200">
+        <div className={`bg-white border-t border-gray-200 ${showVirtualKeyboard ? 'pb-80' : ''}`} style={{ position: 'relative', zIndex: 20 }}>
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <form onSubmit={handleSendMessage} className="flex items-end space-x-3">
               <div className="flex-1 relative">
                 <input
+                  ref={messageInputRef}
                   type="text"
                   value={newMessage}
                   onChange={handleTyping}
                   placeholder={currentUser === chatPartner ? "Cannot message yourself" : "Type your message..."}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
                   disabled={!isConnected || currentUser === chatPartner}
+                  style={{ zIndex: 10, position: 'relative' }}
                 />
                 {currentUser === chatPartner && (
                   <div className="absolute inset-0 bg-gray-50 rounded-md flex items-center justify-center">
@@ -385,6 +412,22 @@ export default function ChatPage() {
                   </div>
                 )}
               </div>
+              
+              {/* Virtual Keyboard Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleVirtualKeyboard}
+                className={`px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+                  showVirtualKeyboard 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 focus:ring-gray-500'
+                }`}
+                title={`${showVirtualKeyboard ? 'Hide' : 'Show'} Virtual Keyboard`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </button>
               
               <button
                 type="submit"
@@ -398,6 +441,29 @@ export default function ChatPage() {
             </form>
           </div>
         </div>
+
+        {/* Virtual Keyboard */}
+        <VirtualKeyboard
+          language={selectedLanguage}
+          onInputChange={handleVirtualKeyboardInput}
+          onKeyPress={handleVirtualKeyboardKeyPress}
+          inputRef={messageInputRef}
+          isVisible={showVirtualKeyboard}
+          onToggle={toggleVirtualKeyboard}
+        />
+
+        {/* Floating Virtual Keyboard Toggle Button */}
+        {!showVirtualKeyboard && (
+          <button
+            onClick={toggleVirtualKeyboard}
+            className="fixed bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors z-40"
+            title="Show Virtual Keyboard"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </button>
+        )}
       </div>
     </>
   )

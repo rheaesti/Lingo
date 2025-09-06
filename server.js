@@ -31,11 +31,17 @@ if (!supabase) {
 
 // Helpers for DB operations
 async function getOrCreateUser(username, preferredLanguage = 'English') {
-  if (!supabase) return null;
+  if (!supabase) {
+    console.error('❌ Supabase client not available');
+    return null;
+  }
+  
+  console.log(`🔍 getOrCreateUser called with username: ${username}, language: ${preferredLanguage}`);
+  
   // Try to find existing user
   let { data: user, error } = await supabase
     .from('users')
-    .select('id, username')
+    .select('id, username, preferred_language')
     .eq('username', username)
     .single();
 
@@ -44,29 +50,44 @@ async function getOrCreateUser(username, preferredLanguage = 'English') {
   }
 
   if (!user) {
+    console.log(`📝 Creating new user: ${username} with language: ${preferredLanguage}`);
+    // Create new user with language preference
     const { data: inserted, error: insertErr } = await supabase
       .from('users')
-      .insert({ username, is_online: true })
-      .select('id, username')
+      .insert({ 
+        username, 
+        is_online: true,
+        preferred_language: preferredLanguage
+      })
+      .select('id, username, preferred_language')
       .single();
     if (insertErr) {
       console.error('getOrCreateUser: insert error', insertErr);
       return null;
     }
     user = inserted;
+    console.log(`✅ New user created:`, user);
   } else {
-    // Mark online
-    await supabase
+    console.log(`🔄 Updating existing user: ${username} with language: ${preferredLanguage}`);
+    // Update existing user - mark online and update language preference
+    const { error: updateErr } = await supabase
       .from('users')
       .update({ 
         is_online: true, 
-        last_seen: new Date().toISOString()
+        last_seen: new Date().toISOString(),
+        preferred_language: preferredLanguage
       })
       .eq('id', user.id);
+    
+    if (updateErr) {
+      console.error('getOrCreateUser: update error', updateErr);
+      return null;
+    }
+    
+    // Update the user object with the new language preference
+    user.preferred_language = preferredLanguage;
+    console.log(`✅ User updated:`, user);
   }
-
-  // Store/update language preference in language_preferences table
-  await storeLanguagePreference(user.id, preferredLanguage);
   
   return user;
 }
@@ -75,7 +96,7 @@ async function getUserByUsername(username) {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('users')
-    .select('id, username')
+    .select('id, username, preferred_language')
     .eq('username', username)
     .single();
   if (error) {
@@ -138,57 +159,16 @@ async function getMessages(chat_room_id) {
   return data || [];
 }
 
-async function storeLanguagePreference(userId, language) {
-  if (!supabase) return null;
-  
-  // Check if user already has a language preference
-  const { data: existing, error: selectError } = await supabase
-    .from('language_preferences')
-    .select('id, language')
-    .eq('user_id', userId)
-    .single();
-
-  if (selectError && selectError.code !== 'PGRST116') {
-    console.error('storeLanguagePreference: select error', selectError);
-  }
-
-  if (existing) {
-    // Update existing preference
-    const { error: updateError } = await supabase
-      .from('language_preferences')
-      .update({ 
-        language: language,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId);
-    
-    if (updateError) {
-      console.error('storeLanguagePreference: update error', updateError);
-    }
-  } else {
-    // Insert new preference
-    const { error: insertError } = await supabase
-      .from('language_preferences')
-      .insert({ 
-        user_id: userId, 
-        language: language,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    
-    if (insertError) {
-      console.error('storeLanguagePreference: insert error', insertError);
-    }
-  }
-}
+// Language preferences are now stored directly in the users table
+// No separate function needed
 
 async function getLanguagePreference(userId) {
   if (!supabase) return 'English';
   
   const { data, error } = await supabase
-    .from('language_preferences')
-    .select('language')
-    .eq('user_id', userId)
+    .from('users')
+    .select('preferred_language')
+    .eq('id', userId)
     .single();
   
   if (error) {
@@ -198,7 +178,7 @@ async function getLanguagePreference(userId) {
     return 'English'; // Default language
   }
   
-  return data?.language || 'English';
+  return data?.preferred_language || 'English';
 }
 
 // Store connected users in memory (socket.id -> { username, userId })
@@ -216,7 +196,9 @@ io.on('connection', (socket) => {
   // Handle user login
   socket.on('user_login', async (data) => {
     const username = typeof data === 'string' ? data : data.username;
-    const preferredLanguage = typeof data === 'object' ? data.preferredLanguage : 'English';
+    const preferredLanguage = typeof data === 'object' && data.preferredLanguage ? data.preferredLanguage : 'English';
+    
+    console.log(`🔍 Login attempt - Username: ${username}, Language: ${preferredLanguage}`);
     
     // If username already connected on another socket, drop the old mapping (prefer latest connection)
     for (const [id, info] of Array.from(connectedUsers.entries())) {
@@ -236,8 +218,12 @@ io.on('connection', (socket) => {
     // Ensure user exists in DB and mark online
     let userRecord = await getOrCreateUser(username, preferredLanguage);
     const userId = userRecord?.id || null;
+    
     if (userId) {
       usernameToUserId.set(username, userId);
+      console.log(`✅ User ${username} created/updated in database with language: ${preferredLanguage}`);
+    } else {
+      console.error(`❌ Failed to create/update user ${username} in database`);
     }
 
     // Store user information
@@ -380,7 +366,7 @@ io.on('connection', (socket) => {
     
     // Get current user's language preference
     const currentUserLanguage = me.preferredLanguage || 'English';
-    const otherUserLanguage = await getLanguagePreference(other.id);
+    const otherUserLanguage = other.preferred_language || 'English';
     
     const history = await Promise.all(rows.map(async (r) => {
       const isReceived = r.sender_id !== me.userId;
