@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -526,11 +526,17 @@ app.post('/translate', async (req, res) => {
     console.log('🔄 Processing translation:', { text, sourceLanguage, targetLanguage });
 
     // Call Sarvam-Translate API directly
+    const sarvamApiKey = process.env.SARVAM_API_KEY || 'sk_wsi7w8tb_It8xiqE4fdrxA44Bb0lbxjVg';
+    
+    if (!sarvamApiKey || sarvamApiKey === 'sk_wsi7w8tb_It8xiqE4fdrxA44Bb0lbxjVg') {
+      console.log('⚠️ Using fallback API key. Please set SARVAM_API_KEY in .env.local');
+    }
+    
     const response = await fetch('https://api.sarvam.ai/translate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer sk_wsi7w8tb_It8xiqE4fdrxA44Bb0lbxjVg`
+        'Authorization': `Bearer ${sarvamApiKey}`
       },
       body: JSON.stringify({
         text: text,
