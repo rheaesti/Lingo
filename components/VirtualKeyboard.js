@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import Keyboard from 'simple-keyboard';
-import 'simple-keyboard/build/css/index.css';
+import Keyboard from 'react-simple-keyboard';
+import 'react-simple-keyboard/build/css/index.css';
 
 const VirtualKeyboard = ({ 
   language = 'English', 
-  onKeyPress, 
+  onKeyPress: onKeyPressCallback, 
   onInputChange, 
   inputRef,
   isVisible = false,
   onToggle 
 }) => {
-  const keyboardRef = useRef(null);
   const [keyboard, setKeyboard] = useState(null);
   const [input, setInput] = useState('');
 
@@ -121,80 +120,27 @@ const VirtualKeyboard = ({
     return layouts[lang] || layouts['English'];
   };
 
-  useEffect(() => {
-    if (keyboardRef.current && isVisible) {
-      // Destroy existing keyboard if it exists
-      if (keyboard) {
-        keyboard.destroy();
-        setKeyboard(null);
-      }
-      
-      // Create new keyboard
-      const newKeyboard = new Keyboard(keyboardRef.current, {
-        layout: getKeyboardLayout(language),
-        onChange: (input) => {
-          setInput(input);
-          if (onInputChange) {
-            onInputChange(input);
-          }
-          if (inputRef && inputRef.current) {
-            inputRef.current.value = input;
-          }
-        },
-        onKeyPress: (button) => {
-          if (onKeyPress) {
-            onKeyPress(button);
-          }
-        },
-        theme: 'hg-theme-default hg-theme-ios',
-        physicalKeyboardHighlight: true,
-        syncInstanceInputs: true,
-        mergeDisplay: true,
-        display: {
-          '{bksp}': '⌫',
-          '{enter}': '↵',
-          '{shift}': '⇧',
-          '{lock}': '⇪',
-          '{tab}': '⇥',
-          '{space}': '⎵'
-        }
-      });
-      
-      setKeyboard(newKeyboard);
-      
-      // Force dark mode styles if needed
-      setTimeout(() => {
-        const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (isDarkMode) {
-          const buttons = keyboardRef.current.querySelectorAll('.hg-button');
-          buttons.forEach(button => {
-            button.style.color = '#ffffff';
-            button.style.backgroundColor = '#374151';
-            button.style.borderColor = '#4b5563';
-          });
-        }
-      }, 100);
+  const onChange = (input) => {
+    setInput(input);
+    if (onInputChange) {
+      onInputChange(input);
     }
-    
-    // Cleanup function
-    return () => {
-      if (keyboard) {
-        keyboard.destroy();
-        setKeyboard(null);
-      }
-    };
-  }, [isVisible, language, onKeyPress, onInputChange, inputRef]);
+    if (inputRef?.current) {
+      inputRef.current.value = input;
+      // Trigger input event to ensure React detects the change
+      const event = new Event('input', { bubbles: true });
+      inputRef.current.dispatchEvent(event);
+    }
+  };
+
+  const onKeyPress = (button) => {
+    if (onKeyPressCallback) {
+      onKeyPressCallback(button);
+    }
+  };
 
   useEffect(() => {
-    if (keyboard) {
-      keyboard.setOptions({
-        layout: getKeyboardLayout(language)
-      });
-    }
-  }, [language, keyboard]);
-
-  useEffect(() => {
-    if (keyboard && inputRef && inputRef.current) {
+    if (keyboard && inputRef?.current) {
       const currentValue = inputRef.current.value;
       if (currentValue !== input) {
         setInput(currentValue);
@@ -202,6 +148,17 @@ const VirtualKeyboard = ({
       }
     }
   }, [keyboard, inputRef]);
+
+  // Sync keyboard input with the input field
+  useEffect(() => {
+    if (keyboard && input !== undefined) {
+      keyboard.setInput(input);
+    }
+  }, [keyboard, input]);
+
+  const onInit = (keyboardInstance) => {
+    setKeyboard(keyboardInstance);
+  };
 
   if (!isVisible) return null;
 
@@ -222,11 +179,27 @@ const VirtualKeyboard = ({
           </button>
         </div>
         <div className="keyboard-container">
-          <div 
-            ref={keyboardRef} 
-            className="simple-keyboard" 
-            data-language={language}
-          ></div>
+          <Keyboard
+            onInit={onInit}
+            layout={getKeyboardLayout(language)}
+            onChange={onChange}
+            onKeyPress={onKeyPress}
+            theme="hg-theme-default hg-theme-ios"
+            physicalKeyboardHighlight={false}
+            syncInstanceInputs={false}
+            mergeDisplay={false}
+            preventMouseDownDefault={true}
+            preventMouseUpDefault={true}
+            useButtonTag={true}
+            display={{
+              '{bksp}': '⌫',
+              '{enter}': '↵',
+              '{shift}': '⇧',
+              '{lock}': '⇪',
+              '{tab}': '⇥',
+              '{space}': '⎵'
+            }}
+          />
         </div>
       </div>
     </div>

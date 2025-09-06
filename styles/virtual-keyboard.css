@@ -9,12 +9,12 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.simple-keyboard {
+.hg-theme-default {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: transparent;
 }
 
-.simple-keyboard .hg-button {
+.hg-theme-default .hg-button {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
@@ -28,124 +28,124 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.simple-keyboard .hg-button:hover {
+.hg-theme-default .hg-button:hover {
   background: #f3f4f6;
   border-color: #d1d5db;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.simple-keyboard .hg-button:active {
+.hg-theme-default .hg-button:active {
   background: #e5e7eb;
   transform: translateY(0);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.simple-keyboard .hg-button.hg-functionBtn {
+.hg-theme-default .hg-button.hg-functionBtn {
   background: #6b7280;
   color: #ffffff;
   font-weight: 600;
 }
 
-.simple-keyboard .hg-button.hg-functionBtn:hover {
+.hg-theme-default .hg-button.hg-functionBtn:hover {
   background: #4b5563;
 }
 
-.simple-keyboard .hg-button.hg-button-space {
+.hg-theme-default .hg-button.hg-button-space {
   min-width: 200px;
 }
 
-.simple-keyboard .hg-button.hg-button-enter {
+.hg-theme-default .hg-button.hg-button-enter {
   background: #3b82f6;
   color: #ffffff;
   font-weight: 600;
 }
 
-.simple-keyboard .hg-button.hg-button-enter:hover {
+.hg-theme-default .hg-button.hg-button-enter:hover {
   background: #2563eb;
 }
 
-.simple-keyboard .hg-button.hg-button-shift,
-.simple-keyboard .hg-button.hg-button-lock {
+.hg-theme-default .hg-button.hg-button-shift,
+.hg-theme-default .hg-button.hg-button-lock {
   background: #10b981;
   color: #ffffff;
   font-weight: 600;
 }
 
-.simple-keyboard .hg-button.hg-button-shift:hover,
-.simple-keyboard .hg-button.hg-button-lock:hover {
+.hg-theme-default .hg-button.hg-button-shift:hover,
+.hg-theme-default .hg-button.hg-button-lock:hover {
   background: #059669;
 }
 
-.simple-keyboard .hg-button.hg-button-bksp {
+.hg-theme-default .hg-button.hg-button-bksp {
   background: #ef4444;
   color: #ffffff;
   font-weight: 600;
 }
 
-.simple-keyboard .hg-button.hg-button-bksp:hover {
+.hg-theme-default .hg-button.hg-button-bksp:hover {
   background: #dc2626;
 }
 
 /* Language-specific styling */
-.simple-keyboard[data-language="Hindi"] .hg-button,
-.simple-keyboard[data-language="Marathi"] .hg-button {
+.hg-theme-default[data-language="Hindi"] .hg-button,
+.hg-theme-default[data-language="Marathi"] .hg-button {
   font-family: 'Noto Sans Devanagari', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Malayalam"] .hg-button {
+.hg-theme-default[data-language="Malayalam"] .hg-button {
   font-family: 'Noto Sans Malayalam', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Tamil"] .hg-button {
+.hg-theme-default[data-language="Tamil"] .hg-button {
   font-family: 'Noto Sans Tamil', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Bengali"] .hg-button {
+.hg-theme-default[data-language="Bengali"] .hg-button {
   font-family: 'Noto Sans Bengali', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Gujarati"] .hg-button {
+.hg-theme-default[data-language="Gujarati"] .hg-button {
   font-family: 'Noto Sans Gujarati', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Telugu"] .hg-button {
+.hg-theme-default[data-language="Telugu"] .hg-button {
   font-family: 'Noto Sans Telugu', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Kannada"] .hg-button {
+.hg-theme-default[data-language="Kannada"] .hg-button {
   font-family: 'Noto Sans Kannada', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Punjabi"] .hg-button {
+.hg-theme-default[data-language="Punjabi"] .hg-button {
   font-family: 'Noto Sans Gurmukhi', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
   font-weight: 500;
 }
 
-.simple-keyboard[data-language="Odia"] .hg-button {
+.hg-theme-default[data-language="Odia"] .hg-button {
   font-family: 'Noto Sans Oriya', 'Noto Sans', 'Arial Unicode MS', sans-serif;
   font-size: 18px;
   line-height: 1.2;
@@ -154,26 +154,26 @@
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .simple-keyboard .hg-button {
+  .hg-theme-default .hg-button {
     height: 35px;
     min-width: 35px;
     font-size: 12px;
     margin: 1px;
   }
   
-  .simple-keyboard .hg-button.hg-button-space {
+  .hg-theme-default .hg-button.hg-button-space {
     min-width: 150px;
   }
 }
 
 @media (max-width: 480px) {
-  .simple-keyboard .hg-button {
+  .hg-theme-default .hg-button {
     height: 30px;
     min-width: 30px;
     font-size: 11px;
   }
   
-  .simple-keyboard .hg-button.hg-button-space {
+  .hg-theme-default .hg-button.hg-button-space {
     min-width: 100px;
   }
 }
@@ -200,126 +200,30 @@
     background: #1f2937 !important;
   }
   
-  .simple-keyboard {
+  .hg-theme-default {
     background: transparent !important;
   }
   
-  .simple-keyboard .hg-button {
+  .hg-theme-default .hg-button {
     background: #374151 !important;
     border-color: #4b5563 !important;
     color: #ffffff !important;
   }
   
-  .simple-keyboard .hg-button:hover {
+  .hg-theme-default .hg-button:hover {
     background: #4b5563 !important;
     border-color: #6b7280 !important;
     color: #ffffff !important;
   }
   
-  .simple-keyboard .hg-button:active {
+  .hg-theme-default .hg-button:active {
     background: #6b7280 !important;
     color: #ffffff !important;
   }
   
   /* Force white text for all buttons in dark mode */
-  .keyboard-container .simple-keyboard .hg-button,
-  .keyboard-container .simple-keyboard .hg-button * {
-    color: #ffffff !important;
-  }
-}
-
-/* Additional dark mode support for when browser doesn't detect it */
-.dark .keyboard-container {
-  background: #1f2937 !important;
-}
-
-.dark .simple-keyboard .hg-button {
-  background: #374151 !important;
-  border-color: #4b5563 !important;
-  color: #ffffff !important;
-}
-
-.dark .simple-keyboard .hg-button:hover {
-  background: #4b5563 !important;
-  border-color: #6b7280 !important;
-  color: #ffffff !important;
-}
-
-.dark .keyboard-container .simple-keyboard .hg-button,
-.dark .keyboard-container .simple-keyboard .hg-button * {
-  color: #ffffff !important;
-}
-
-/* Force dark mode styles with higher specificity */
-@media (prefers-color-scheme: dark) {
-  .keyboard-container {
-    background: #1f2937 !important;
-  }
-  
-  .simple-keyboard .hg-button {
-    background: #374151 !important;
-    border-color: #4b5563 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button:hover {
-    background: #4b5563 !important;
-    border-color: #6b7280 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button:active {
-    background: #6b7280 !important;
-    color: #ffffff !important;
-  }
-  
-  /* Force all text to be white in dark mode */
-  .keyboard-container .simple-keyboard .hg-button,
-  .keyboard-container .simple-keyboard .hg-button *,
-  .keyboard-container .simple-keyboard .hg-button::before,
-  .keyboard-container .simple-keyboard .hg-button::after {
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-functionBtn {
-    background: #6b7280 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-functionBtn:hover {
-    background: #4b5563 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-button-enter {
-    background: #3b82f6 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-button-enter:hover {
-    background: #2563eb !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-button-shift,
-  .simple-keyboard .hg-button.hg-button-lock {
-    background: #10b981 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-button-shift:hover,
-  .simple-keyboard .hg-button.hg-button-lock:hover {
-    background: #059669 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-button-bksp {
-    background: #ef4444 !important;
-    color: #ffffff !important;
-  }
-  
-  .simple-keyboard .hg-button.hg-button-bksp:hover {
-    background: #dc2626 !important;
+  .keyboard-container .hg-theme-default .hg-button,
+  .keyboard-container .hg-theme-default .hg-button * {
     color: #ffffff !important;
   }
 }

@@ -16,6 +16,26 @@ export default function LoginPage() {
   
   const usernameInputRef = useRef(null)
 
+  const handleVirtualKeyboardInput = (input) => {
+    setUsername(input)
+    if (usernameInputRef.current) {
+      usernameInputRef.current.value = input
+      // Trigger input event to ensure React detects the change
+      const event = new Event('input', { bubbles: true });
+      usernameInputRef.current.dispatchEvent(event);
+    }
+  }
+
+  const handleVirtualKeyboardKeyPress = (button) => {
+    if (button === '{enter}') {
+      handleSubmit(new Event('submit'))
+    }
+  }
+
+  const toggleVirtualKeyboard = () => {
+    setShowVirtualKeyboard(!showVirtualKeyboard)
+  }
+
   useEffect(() => {
     // Check if user is already logged in
     const storedUsername = localStorage.getItem('username')
@@ -78,22 +98,6 @@ export default function LoginPage() {
     })
   }
 
-  const handleVirtualKeyboardInput = (input) => {
-    setUsername(input)
-    if (usernameInputRef.current) {
-      usernameInputRef.current.value = input
-    }
-  }
-
-  const handleVirtualKeyboardKeyPress = (button) => {
-    if (button === '{enter}') {
-      handleSubmit(new Event('submit'))
-    }
-  }
-
-  const toggleVirtualKeyboard = () => {
-    setShowVirtualKeyboard(!showVirtualKeyboard)
-  }
 
   return (
     <>
@@ -238,14 +242,6 @@ export default function LoginPage() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Footer */}
-          <div className="text-center mt-8">
-            <p className="text-sm text-gray-500">
-              Open multiple tabs to test with different users
-            </p>
-          </div>
         </div>
 
         {/* Virtual Keyboard */}
@@ -257,6 +253,15 @@ export default function LoginPage() {
           isVisible={showVirtualKeyboard}
           onToggle={toggleVirtualKeyboard}
         />
+
+        {/* Footer */}
+          <div className="text-center mt-8">
+            <p className="text-sm text-gray-500">
+              Open multiple tabs to test with different users
+            </p>
+          </div>
+        </div>
+
       </div>
     </>
   )

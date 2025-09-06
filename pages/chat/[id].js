@@ -24,6 +24,39 @@ export default function ChatPage() {
   const typingTimeoutRef = useRef(null)
   const messageInputRef = useRef(null)
 
+  const handleVirtualKeyboardInput = (input) => {
+    setNewMessage(input)
+    if (messageInputRef.current) {
+      messageInputRef.current.value = input
+      // Trigger typing indicator
+      if (!isTyping) {
+        setIsTyping(true)
+        socket.emit('typing_start', { to: chatPartner, from: currentUser })
+      }
+      
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      
+      // Set new timeout to stop typing indicator
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false)
+        socket.emit('typing_stop', { to: chatPartner, from: currentUser })
+      }, 1000)
+    }
+  }
+
+  const handleVirtualKeyboardKeyPress = (button) => {
+    if (button === '{enter}') {
+      handleSendMessage()
+    }
+  }
+
+  const toggleVirtualKeyboard = () => {
+    setShowVirtualKeyboard(!showVirtualKeyboard)
+  }
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -54,8 +87,11 @@ export default function ChatPage() {
     // Server emits 'chat_history' with normalized records
     socket = io('http://localhost:5000')
 
-    // Re-login with the stored username (this will handle duplicate connections)
-    socket.emit('user_login', username)
+    // Re-login with the stored username and language (this will handle duplicate connections)
+    socket.emit('user_login', { 
+      username: username, 
+      preferredLanguage: language 
+    })
     // Request history once logged in
     socket.emit('fetch_history', { with: chatPartner, for: username })
 
@@ -197,22 +233,36 @@ export default function ChatPage() {
     setChatHistory([])
   }
 
-  const handleVirtualKeyboardInput = (input) => {
-    setNewMessage(input)
+  
+  const clearInput = () => {
+    setNewMessage('')
     if (messageInputRef.current) {
-      messageInputRef.current.value = input
+      messageInputRef.current.value = ''
+    }
+    // Force stop any ongoing input
+    if (messageInputRef.current) {
+      messageInputRef.current.blur()
+      setTimeout(() => {
+        if (messageInputRef.current) {
+          messageInputRef.current.focus()
+        }
+      }, 100)
     }
   }
-
-  const handleVirtualKeyboardKeyPress = (button) => {
-    if (button === '{enter}') {
-      handleSendMessage()
+  
+  const emergencyStop = () => {
+    setNewMessage('')
+    setShowVirtualKeyboard(false)
+    if (messageInputRef.current) {
+      messageInputRef.current.value = ''
+      messageInputRef.current.blur()
+    }
+    // Clear any pending timeouts
+    if (handleVirtualKeyboardInput.timeout) {
+      clearTimeout(handleVirtualKeyboardInput.timeout);
     }
   }
-
-  const toggleVirtualKeyboard = () => {
-    setShowVirtualKeyboard(!showVirtualKeyboard)
-  }
+  
 
   const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString([], { 
@@ -392,20 +442,47 @@ export default function ChatPage() {
         </div>
 
         {/* Message Input */}
-        <div className={`bg-white border-t border-gray-200 ${showVirtualKeyboard ? 'pb-80' : ''}`} style={{ position: 'relative', zIndex: 20 }}>
+        <div className="bg-white border-t border-gray-200" style={{ position: 'relative', zIndex: 20 }}>
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <form onSubmit={handleSendMessage} className="flex items-end space-x-3">
               <div className="flex-1 relative">
-                <input
-                  ref={messageInputRef}
-                  type="text"
-                  value={newMessage}
-                  onChange={handleTyping}
-                  placeholder={currentUser === chatPartner ? "Cannot message yourself" : "Type your message..."}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
-                  disabled={!isConnected || currentUser === chatPartner}
-                  style={{ zIndex: 10, position: 'relative' }}
-                />
+                <div className="relative">
+                  <input
+                    ref={messageInputRef}
+                    type="text"
+                    value={newMessage}
+                    onChange={handleTyping}
+                    placeholder={currentUser === chatPartner ? "Cannot message yourself" : "Type your message..."}
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                    disabled={!isConnected || currentUser === chatPartner}
+                    style={{ zIndex: 10, position: 'relative' }}
+                  />
+                  {newMessage && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex space-x-1">
+                      <button
+                        type="button"
+                        onClick={clearInput}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Clear input"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={emergencyStop}
+                        className="text-red-400 hover:text-red-600 transition-colors"
+                        title="Emergency stop"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {currentUser === chatPartner && (
                   <div className="absolute inset-0 bg-gray-50 rounded-md flex items-center justify-center">
                     <span className="text-gray-500 text-sm">Cannot message yourself</span>
