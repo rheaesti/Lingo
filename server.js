@@ -4,6 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const translationService = require('./translationService');
 
 const app = express();
 const server = http.createServer(app);
@@ -131,12 +132,28 @@ async function getOrCreateChatRoom(userAId, userBId) {
   return inserted;
 }
 
-async function insertMessage(chat_room_id, sender_id, content) {
+async function insertMessage(chat_room_id, sender_id, content, translationData = null) {
   if (!supabase) return null;
+  
+  const messageData = {
+    chat_room_id,
+    sender_id,
+    content,
+    message_type: 'text'
+  };
+  
+  // Add translation data if provided
+  if (translationData) {
+    messageData.translated_content = translationData.translatedContent;
+    messageData.original_language = translationData.originalLanguage;
+    messageData.translated_language = translationData.translatedLanguage;
+    messageData.is_translated = translationData.isTranslated;
+  }
+  
   const { data, error } = await supabase
     .from('messages')
-    .insert({ chat_room_id, sender_id, content, message_type: 'text' })
-    .select('id, chat_room_id, sender_id, content, created_at')
+    .insert(messageData)
+    .select('id, chat_room_id, sender_id, content, translated_content, original_language, translated_language, is_translated, created_at')
     .single();
   if (error) {
     console.error('insertMessage error', error);
@@ -149,7 +166,7 @@ async function getMessages(chat_room_id) {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('messages')
-    .select('id, sender_id, content, created_at')
+    .select('id, sender_id, content, translated_content, original_language, translated_language, is_translated, created_at')
     .eq('chat_room_id', chat_room_id)
     .order('created_at', { ascending: true });
   if (error) {
@@ -270,17 +287,6 @@ io.on('connection', (socket) => {
 
     // Persist message in DB first; only deliver if saved
     let persisted = null;
-    if (sender?.userId && recipientUserId) {
-      const room = await getOrCreateChatRoom(sender.userId, recipientUserId);
-      if (room?.id) {
-        persisted = await insertMessage(room.id, sender.userId, message);
-      }
-    }
-    if (!persisted) {
-      socket.emit('message_error', 'Database unavailable: message not saved');
-      return;
-    }
-
     // Find the recipient's socket and get their language preference
     let recipientSocket = null;
     let recipientLanguage = 'English'; // Default language
@@ -295,60 +301,81 @@ io.on('connection', (socket) => {
     // Get sender's language preference
     const senderLanguage = sender?.preferredLanguage || 'English';
 
-    if (recipientSocket) {
-      // Auto-translate message for recipient if languages are different
-      let translatedMessage = message;
-      if (senderLanguage !== recipientLanguage) {
-        try {
-          const translationResponse = await fetch('http://localhost:5000/translate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              text: message,
-              sourceLanguage: senderLanguage,
-              targetLanguage: recipientLanguage
-            })
-          });
+    // Prepare translation data
+    let translatedMessage = message;
+    let translationData = null;
+    
+    if (recipientSocket && senderLanguage !== recipientLanguage) {
+      try {
+        const translationResponse = await fetch('http://localhost:5000/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: message,
+            sourceLanguage: senderLanguage,
+            targetLanguage: recipientLanguage
+          })
+        });
 
-          if (translationResponse.ok) {
-            const translationResult = await translationResponse.json();
-            translatedMessage = translationResult.translatedText;
-            console.log(`Auto-translated message from ${senderLanguage} to ${recipientLanguage}: ${message} -> ${translatedMessage}`);
-          }
-        } catch (error) {
-          console.error('Auto-translation failed:', error);
-          // Continue with original message if translation fails
+        if (translationResponse.ok) {
+          const translationResult = await translationResponse.json();
+          translatedMessage = translationResult.translatedText;
+          translationData = {
+            translatedContent: translatedMessage,
+            originalLanguage: senderLanguage,
+            translatedLanguage: recipientLanguage,
+            isTranslated: true
+          };
+          console.log(`Auto-translated message from ${senderLanguage} to ${recipientLanguage}: ${message} -> ${translatedMessage}`);
         }
+      } catch (error) {
+        console.error('Auto-translation failed:', error);
+        // Continue with original message if translation fails
       }
+    }
 
-      // Send translated message to recipient (online)
+    // Store message in database with translation data
+    if (sender?.userId && recipientUserId) {
+      const room = await getOrCreateChatRoom(sender.userId, recipientUserId);
+      if (room?.id) {
+        persisted = await insertMessage(room.id, sender.userId, message, translationData);
+      }
+    }
+    if (!persisted) {
+      socket.emit('message_error', 'Database unavailable: message not saved');
+      return;
+    }
+
+    // Send translated message to recipient (online)
+    if (recipientSocket) {
       io.to(recipientSocket).emit('private_message', {
         from,
-        message: translatedMessage,
-        originalMessage: message,
+        text: translatedMessage,  // translated version for receiver
+        message: translatedMessage,  // keep for backward compatibility
+        original: message,  // original text
+        originalMessage: message,  // keep for backward compatibility
         originalLanguage: senderLanguage,
         translatedLanguage: recipientLanguage,
         isTranslated: senderLanguage !== recipientLanguage,
         timestamp: persisted.created_at || new Date().toISOString()
       });
+    }
 
-      // Send confirmation to sender (original message)
-      socket.emit('message_sent', {
-        to,
-        message,
-        timestamp: persisted.created_at || new Date().toISOString()
-      });
+    // Send confirmation to sender (original message)
+    socket.emit('message_sent', {
+      to,
+      text: message,  // original text for sender
+      message,  // keep for backward compatibility
+      original: message,  // original text
+      isTranslated: false,  // sender sees original
+      timestamp: persisted.created_at || new Date().toISOString()
+    });
 
+    if (recipientSocket) {
       console.log(`Message sent from ${from} to ${to} (online) - Auto-translated: ${senderLanguage} -> ${recipientLanguage}`);
     } else {
-      // Recipient offline: confirmation to sender; message already persisted in DB
-      socket.emit('message_sent', {
-        to,
-        message,
-        timestamp: persisted.created_at || new Date().toISOString()
-      });
       console.log(`Message persisted for offline delivery from ${from} to ${to}`);
     }
   });
@@ -368,49 +395,55 @@ io.on('connection', (socket) => {
     const currentUserLanguage = me.preferredLanguage || 'English';
     const otherUserLanguage = other.preferred_language || 'English';
     
-    const history = await Promise.all(rows.map(async (r) => {
+    const history = rows.map((r) => {
       const isReceived = r.sender_id !== me.userId;
       let message = r.content;
-      let isTranslated = false;
-      let originalLanguage = currentUserLanguage;
-      let translatedLanguage = currentUserLanguage;
+      let originalMessage = r.content;
+      let isTranslated = r.is_translated || false;
+      let originalLanguage = r.original_language;
+      let translatedLanguage = r.translated_language;
       
-      // If it's a received message and languages are different, translate it
-      if (isReceived && currentUserLanguage !== otherUserLanguage) {
-        try {
-          const translationResponse = await fetch('http://localhost:5000/translate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              text: r.content,
-              sourceLanguage: otherUserLanguage,
-              targetLanguage: currentUserLanguage
-            })
-          });
-
-          if (translationResponse.ok) {
-            const translationResult = await translationResponse.json();
-            message = translationResult.translatedText;
-            isTranslated = true;
-            originalLanguage = otherUserLanguage;
-            translatedLanguage = currentUserLanguage;
-          }
-        } catch (error) {
-          console.error('History translation failed:', error);
-        }
+      console.log(`Processing chat history message:`, {
+        content: r.content,
+        translated_content: r.translated_content,
+        is_translated: r.is_translated,
+        original_language: r.original_language,
+        translated_language: r.translated_language,
+        isReceived: isReceived
+      });
+      
+      // If it's a received message and we have translation data, use it
+      if (isReceived && r.translated_content) {
+        message = r.translated_content;
+        originalMessage = r.content;
+        isTranslated = true;
+        originalLanguage = r.original_language;
+        translatedLanguage = r.translated_language;
+      }
+      
+      // For messages without translation data, ensure originalMessage is set
+      if (!originalMessage) {
+        originalMessage = r.content;
+      }
+      
+      // Set default language values if not available
+      if (!originalLanguage) {
+        originalLanguage = isReceived ? otherUserLanguage : currentUserLanguage;
+      }
+      if (!translatedLanguage) {
+        translatedLanguage = isReceived ? currentUserLanguage : otherUserLanguage;
       }
       
       return {
         message: message,
+        originalMessage: originalMessage,
         timestamp: r.created_at,
         type: isReceived ? 'received' : 'sent',
         isTranslated: isTranslated,
         originalLanguage: originalLanguage,
         translatedLanguage: translatedLanguage
       };
-    }));
+    });
     
     socket.emit('chat_history', { with: otherUsername, messages: history });
   });
@@ -512,97 +545,65 @@ app.get('/db-check', async (req, res) => {
   }
 });
 
-// Translation endpoint using Sarvam-Translate
+// Translation endpoint using local Sarvam-Translate model
 app.post('/translate', async (req, res) => {
   try {
     console.log('🔄 Translation request received:', req.body);
-    const { text, targetLanguage, sourceLanguage = 'auto' } = req.body;
+    const { text, targetLanguage, sourceLanguage = 'English' } = req.body;
     
     if (!text || !targetLanguage) {
       console.log('❌ Missing required fields:', { text, targetLanguage, sourceLanguage });
       return res.status(400).json({ error: 'Text and target language are required' });
     }
     
-    console.log('🔄 Processing translation:', { text, sourceLanguage, targetLanguage });
+    console.log('🔄 Processing translation with local model:', { text, sourceLanguage, targetLanguage });
 
-    // Call Sarvam-Translate API directly
-    const sarvamApiKey = process.env.SARVAM_API_KEY || 'sk_wsi7w8tb_It8xiqE4fdrxA44Bb0lbxjVg';
+    // Use local translation service
+    const result = await translationService.translate(text, sourceLanguage, targetLanguage);
     
-    if (!sarvamApiKey || sarvamApiKey === 'sk_wsi7w8tb_It8xiqE4fdrxA44Bb0lbxjVg') {
-      console.log('⚠️ Using fallback API key. Please set SARVAM_API_KEY in .env.local');
-    }
-    
-    const response = await fetch('https://api.sarvam.ai/translate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sarvamApiKey}`
-      },
-      body: JSON.stringify({
-        text: text,
-        source_language: sourceLanguage,
-        target_language: targetLanguage
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Sarvam API Error Details:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      });
-      throw new Error(`Translation API error: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    res.json({ 
-      translatedText: result.translated_text || result.text || 'Translation failed',
-      sourceLanguage: result.source_language || sourceLanguage,
-      targetLanguage: result.target_language || targetLanguage
-    });
+    res.json(result);
 
   } catch (error) {
     console.error('Translation error:', error);
     console.log('Error details:', {
       message: error.message,
       stack: error.stack,
-      text,
-      sourceLanguage,
-      targetLanguage
+      text: req.body.text,
+      sourceLanguage: req.body.sourceLanguage,
+      targetLanguage: req.body.targetLanguage
     });
     
     // Fallback: Return a mock translation for testing
     const mockTranslations = {
       'English': {
-        'Malayalam': `[Translated to Malayalam] ${text}`,
-        'Hindi': `[Translated to Hindi] ${text}`,
-        'Tamil': `[Translated to Tamil] ${text}`,
-        'Bengali': `[Translated to Bengali] ${text}`,
-        'Gujarati': `[Translated to Gujarati] ${text}`,
-        'Telugu': `[Translated to Telugu] ${text}`,
-        'Kannada': `[Translated to Kannada] ${text}`,
-        'Punjabi': `[Translated to Punjabi] ${text}`,
-        'Marathi': `[Translated to Marathi] ${text}`,
-        'Odia': `[Translated to Odia] ${text}`
+        'Malayalam': `[Translated to Malayalam] ${req.body.text}`,
+        'Hindi': `[Translated to Hindi] ${req.body.text}`,
+        'Tamil': `[Translated to Tamil] ${req.body.text}`,
+        'Bengali': `[Translated to Bengali] ${req.body.text}`,
+        'Gujarati': `[Translated to Gujarati] ${req.body.text}`,
+        'Telugu': `[Translated to Telugu] ${req.body.text}`,
+        'Kannada': `[Translated to Kannada] ${req.body.text}`,
+        'Punjabi': `[Translated to Punjabi] ${req.body.text}`,
+        'Marathi': `[Translated to Marathi] ${req.body.text}`,
+        'Odia': `[Translated to Odia] ${req.body.text}`
       },
       'Malayalam': {
-        'English': `[Translated to English] ${text}`,
-        'Hindi': `[Translated to Hindi] ${text}`,
-        'Tamil': `[Translated to Tamil] ${text}`
+        'English': `[Translated to English] ${req.body.text}`,
+        'Hindi': `[Translated to Hindi] ${req.body.text}`,
+        'Tamil': `[Translated to Tamil] ${req.body.text}`
       }
     };
     
-    const fallbackTranslation = mockTranslations[sourceLanguage]?.[targetLanguage] || 
-                               `[Translation failed - API error] ${text}`;
+    const fallbackTranslation = mockTranslations[req.body.sourceLanguage]?.[req.body.targetLanguage] || 
+                               `[Translation failed - Model error] ${req.body.text}`;
     
-    console.log(`🔄 Using fallback translation: ${sourceLanguage} -> ${targetLanguage}`);
+    console.log(`🔄 Using fallback translation: ${req.body.sourceLanguage} -> ${req.body.targetLanguage}`);
     console.log(`🔄 Fallback result: ${fallbackTranslation}`);
     
     res.json({ 
       translatedText: fallbackTranslation,
-      sourceLanguage: sourceLanguage,
-      targetLanguage: targetLanguage,
+      sourceLanguage: req.body.sourceLanguage,
+      targetLanguage: req.body.targetLanguage,
       isFallback: true
     });
   }

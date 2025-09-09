@@ -108,9 +108,23 @@ export default function ChatPage() {
       if (data.from === chatPartner) {
         const messageData = {
           ...data,
-          type: 'received'
+          type: 'received',
+          message: data.message,  // Use translated text
+          originalMessage: data.originalMessage,  // Keep original for reference
+          isTranslated: data.isTranslated,
+          originalLanguage: data.originalLanguage,
+          translatedLanguage: data.translatedLanguage
         }
         
+        console.log('📥 Received message with translation data:', {
+          from: data.from,
+          translatedText: data.message,
+          originalText: data.originalMessage,
+          isTranslated: data.isTranslated,
+          originalLanguage: data.originalLanguage,
+          translatedLanguage: data.translatedLanguage
+        });
+        console.log('📥 Final messageData object:', messageData);
         setMessages(prev => [...prev, messageData])
         
         // If this is an offline message, show a notification
@@ -126,11 +140,18 @@ export default function ChatPage() {
       if (data.to === chatPartner) {
         const messageData = {
           from: currentUser,
-          message: data.message,
+          message: data.message,  // Use original text for sender
+          originalMessage: data.message,  // Keep original for reference
           timestamp: data.timestamp,
-          type: 'sent'
+          type: 'sent',
+          isTranslated: data.isTranslated || false
         }
         
+        console.log('📤 Sent message data:', {
+          to: data.to,
+          originalText: data.message,
+          isTranslated: data.isTranslated
+        });
         setMessages(prev => [...prev, messageData])
       }
     })
@@ -138,6 +159,7 @@ export default function ChatPage() {
     // Receive DB chat history
     socket.on('chat_history', (payload) => {
       if (payload.with === chatPartner && Array.isArray(payload.messages)) {
+        console.log('Received chat history with translation data:', payload.messages);
         setMessages(payload.messages)
       }
     })
@@ -384,26 +406,54 @@ export default function ChatPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.type === 'sent' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${
-                      message.type === 'sent' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-white text-gray-800 border border-gray-200'
-                    }`}>
-                      <p className="text-sm leading-relaxed">
-                        {message.message}
-                      </p>
+                {messages.map((message, index) => {
+                  console.log(`Rendering message ${index}:`, {
+                    message: message.message,
+                    originalMessage: message.originalMessage,
+                    isTranslated: message.isTranslated,
+                    originalLanguage: message.originalLanguage,
+                    translatedLanguage: message.translatedLanguage,
+                    type: message.type
+                  });
+                  
+                  return (
+                    <div
+                      key={index}
+                      className={`flex ${message.type === 'sent' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${
+                        message.type === 'sent' 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-white text-gray-800 border border-gray-200'
+                      }`}>
+                        <p className="text-sm leading-relaxed">
+                          {message.message}
+                        </p>
                       {message.isTranslated && message.type === 'received' && (
+                        <div className="mt-2 space-y-1">
+                          <p className={`text-xs italic ${
+                            message.type === 'sent' 
+                              ? 'text-blue-200' 
+                              : 'text-gray-500'
+                          }`}>
+                            🔄 Auto-translated from {message.originalLanguage} to {message.translatedLanguage}
+                          </p>
+                          <p className={`text-xs ${
+                            message.type === 'sent' 
+                              ? 'text-blue-200' 
+                              : 'text-gray-400'
+                          }`}>
+                            Original: {message.originalMessage}
+                          </p>
+                        </div>
+                      )}
+                      {message.isTranslated && message.type === 'sent' && (
                         <p className={`text-xs mt-1 italic ${
                           message.type === 'sent' 
                             ? 'text-blue-200' 
                             : 'text-gray-400'
                         }`}>
-                          🔄 Auto-translated from {message.originalLanguage} to {message.translatedLanguage}
+                          📤 Sent in your language
                         </p>
                       )}
                       <p className={`text-xs mt-2 ${
@@ -415,7 +465,8 @@ export default function ChatPage() {
                       </p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 
                 {/* Typing indicator */}
                 {typingUsers.has(chatPartner) && (
