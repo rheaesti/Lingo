@@ -5,8 +5,8 @@ class TranslationService {
   constructor() {
     this.isLoading = false;
     this.isLoaded = false;
-    this.usePythonScript = false; // Set to true to use Python script
-    
+    this.usePythonScript = true; // Set to true to use Python script
+
     // Language mapping for Sarvam-Translate model
     this.languageMap = {
       'English': 'en-IN',
@@ -54,7 +54,7 @@ class TranslationService {
         console.log('   1. Install Python dependencies: pip install -r requirements.txt');
         console.log('   2. Set usePythonScript = true in translationService.js');
       }
-      
+
       this.isLoaded = true;
       this.isLoading = false;
       console.log('✅ Translation service initialized');
@@ -68,7 +68,7 @@ class TranslationService {
   async testPythonScript() {
     return new Promise((resolve, reject) => {
       const python = spawn('python', ['sarvam_translate.py', '--help']);
-      
+
       python.on('close', (code) => {
         if (code === 0) {
           console.log('✅ Python script is available');
@@ -78,7 +78,7 @@ class TranslationService {
           resolve(); // Don't reject, just fall back to mock
         }
       });
-      
+
       python.on('error', (error) => {
         console.log('⚠️ Python script not available, falling back to mock service');
         resolve(); // Don't reject, just fall back to mock
@@ -94,18 +94,18 @@ class TranslationService {
         '--target-language', targetLanguage,
         '--source-language', sourceLanguage
       ]);
-      
+
       let output = '';
       let errorOutput = '';
-      
+
       python.stdout.on('data', (data) => {
         output += data.toString();
       });
-      
+
       python.stderr.on('data', (data) => {
         errorOutput += data.toString();
       });
-      
+
       python.on('close', (code) => {
         if (code === 0) {
           try {
@@ -118,7 +118,7 @@ class TranslationService {
           reject(new Error(`Python script failed with code ${code}: ${errorOutput}`));
         }
       });
-      
+
       python.on('error', (error) => {
         reject(error);
       });
@@ -138,6 +138,7 @@ class TranslationService {
     const sourceCode = this.languageMap[sourceLanguage];
     const targetCode = this.languageMap[targetLanguage];
 
+    console.log(`🔄 Translating from ${sourceCode} to ${targetCode}`);
     if (!sourceCode || !targetCode) {
       throw new Error(`Unsupported language: ${sourceLanguage} or ${targetLanguage}`);
     }
@@ -146,17 +147,17 @@ class TranslationService {
     if (sourceCode === targetCode) {
       return {
         translatedText: text,
-        sourceLanguage: sourceLanguage,
-        targetLanguage: targetLanguage,
+        sourceLanguage: sourceCode,
+        targetLanguage: targetCode,
         isTranslated: false
       };
     }
 
     try {
       console.log(`🔄 Translating from ${sourceLanguage} (${sourceCode}) to ${targetLanguage} (${targetCode})`);
-      
+
       let result;
-      
+
       if (this.usePythonScript) {
         try {
           result = await this.translateWithPython(text, sourceLanguage, targetLanguage);
@@ -240,8 +241,8 @@ class TranslationService {
         'Odia': `[Odia] ${text}`
       }
     };
-    
-    const translatedText = mockTranslations[sourceLanguage]?.[targetLanguage] || 
+
+    const translatedText = mockTranslations[sourceLanguage]?.[targetLanguage] ||
                          `[Translated to ${targetLanguage}] ${text}`;
 
     return {
