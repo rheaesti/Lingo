@@ -9,6 +9,9 @@ A real-time chatting webapp built with Next.js (frontend) and Node.js with Socke
 - **Online Users**: See who's currently online in real-time
 - **One-to-One Chat**: Private conversations between users
 - **Typing Indicators**: See when someone is typing
+- **Real-time Translation**: AI-powered translation using Sarvam-Translate model
+- **Multi-language Support**: Support for 22+ Indian languages
+- **Virtual Keyboard**: On-screen keyboard for regional language input
 - **Modern UI**: Clean, WhatsApp-like interface built with TailwindCSS
 - **Responsive Design**: Works on desktop and mobile devices
 
@@ -26,6 +29,12 @@ A real-time chatting webapp built with Next.js (frontend) and Node.js with Socke
 - **Supabase** - PostgreSQL database with real-time features
 - **CORS** - Cross-origin resource sharing
 
+### Translation & AI
+- **Sarvam-Translate** - AI-powered translation model for Indian languages
+- **Python 3** - Translation service backend
+- **Transformers** - Hugging Face transformers library
+- **PyTorch** - Deep learning framework
+
 ## Project Structure
 
 ```
@@ -36,8 +45,15 @@ lingo/
 ├── next.config.js         # Next.js configuration
 ├── tailwind.config.js     # TailwindCSS configuration
 ├── postcss.config.js      # PostCSS configuration
+├── requirements.txt       # Python dependencies for translation service
+├── sarvam_translate.py    # Python script for Sarvam-Translate model
+├── translationService.js  # Node.js translation service wrapper
+├── test_final_translation.js # Translation testing script
+├── components/
+│   └── VirtualKeyboard.js # Virtual keyboard component for regional languages
 ├── styles/
-│   └── globals.css        # Global styles and TailwindCSS imports
+│   ├── globals.css        # Global styles and TailwindCSS imports
+│   └── virtual-keyboard.css # Virtual keyboard specific styles
 ├── pages/
 │   ├── _app.js           # Main app component with routing logic
 │   ├── _document.js      # HTML document structure
@@ -46,6 +62,8 @@ lingo/
 │   └── chat/
 │       └── [id].js       # Individual chat page
 ├── DATABASE.md           # Database schema documentation
+├── AGENTS.md             # AI agents documentation
+├── SARVAM_TRANSLATE_SETUP.md # Translation setup guide
 └── README.md             # This file
 ```
 
@@ -55,6 +73,7 @@ lingo/
 
 - Node.js (v16 or higher)
 - npm or yarn
+- Python 3.8 or higher (for translation service)
 - Supabase account and project
 
 ### Installation
@@ -70,7 +89,12 @@ lingo/
    npm install
    ```
 
-3. **Set up Supabase**
+3. **Install Python dependencies (for translation service)**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Set up Supabase**
    - Create a new project at [supabase.com](https://supabase.com)
    - Copy your project URL and service role key
    - Create a `.env` file with your credentials:
@@ -80,11 +104,16 @@ lingo/
    PORT=5000
    ```
 
-4. **Set up the database**
+5. **Set up the database**
    - Go to your Supabase dashboard → SQL Editor
    - Run the SQL commands from `DATABASE.md` to create the required tables
 
-5. **Start the development servers**
+6. **Configure translation service (optional)**
+   - By default, the app uses mock translations
+   - To enable real Sarvam-Translate model, set `usePythonScript = true` in `translationService.js`
+   - See `SARVAM_TRANSLATE_SETUP.md` for detailed setup instructions
+
+7. **Start the development servers**
    ```bash
    npm run dev
    ```
@@ -108,7 +137,11 @@ lingo/
 
 4. **Start Chatting**: Click on any user to start a private conversation
 
-5. **Test Multi-User**: Open the app in multiple browser tabs with different usernames to test real-time messaging
+5. **Use Translation**: Select source and target languages to enable real-time translation
+
+6. **Virtual Keyboard**: Use the on-screen keyboard for typing in regional languages
+
+7. **Test Multi-User**: Open the app in multiple browser tabs with different usernames to test real-time messaging
 
 ## API Endpoints
 
@@ -124,6 +157,8 @@ lingo/
 - `private_message` - Send private message
 - `typing_start` - Start typing indicator
 - `typing_stop` - Stop typing indicator
+- `translate_message` - Request message translation
+- `set_language_preference` - Set user's language preference
 
 #### Server to Client
 - `login_success` - Login successful
@@ -135,6 +170,8 @@ lingo/
 - `message_sent` - Message sent confirmation
 - `typing_start` - User started typing
 - `typing_stop` - User stopped typing
+- `translation_result` - Translation response
+- `supported_languages` - List of supported languages
 
 ## Features in Detail
 
@@ -143,6 +180,13 @@ lingo/
 - Message persistence with Supabase PostgreSQL database
 - Typing indicators show when someone is composing a message
 - Chat history is automatically saved and retrieved
+
+### Translation Features
+- AI-powered translation using Sarvam-Translate model
+- Support for 22+ Indian languages including Hindi, Tamil, Malayalam, Bengali, etc.
+- Real-time translation of messages during chat
+- Fallback to mock translation when AI model is not available
+- Language preference settings per user
 
 ### User Management
 - Usernames must be unique across all connected users
@@ -155,17 +199,50 @@ lingo/
 - Smooth animations and transitions
 - Loading states and error handling
 - Auto-scroll to latest messages
+- Virtual keyboard for regional language input
+- Language selection dropdowns
+- Translation status indicators
 
 ## Future Enhancements
 
 The codebase is designed to be modular for future integrations:
 
-- **Translation APIs**: Ready for Bhashini/Gemini integration
-- **Message Persistence**: Database integration for message storage
+- **Enhanced Translation**: Integration with additional translation APIs (Bhashini, Google Translate)
+- **Voice Messages**: Audio message recording and playback
 - **File Sharing**: Image and document sharing capabilities
-- **Group Chats**: Multi-user conversations
+- **Group Chats**: Multi-user conversations with translation support
 - **User Profiles**: Avatar and status updates
 - **Message Encryption**: End-to-end encryption
+- **Offline Support**: Message queuing when offline
+- **Translation History**: Save and manage translation preferences
+
+## Supported Languages
+
+The translation service supports 22+ Indian languages:
+
+- **English** (en-IN)
+- **Hindi** (hi-IN)
+- **Bengali** (bn-IN)
+- **Tamil** (ta-IN)
+- **Telugu** (te-IN)
+- **Gujarati** (gu-IN)
+- **Kannada** (kn-IN)
+- **Malayalam** (ml-IN)
+- **Marathi** (mr-IN)
+- **Punjabi** (pa-IN)
+- **Odia** (or-IN)
+- **Assamese** (as-IN)
+- **Bodo** (brx-IN)
+- **Dogri** (doi-IN)
+- **Kashmiri** (ks-IN)
+- **Konkani** (gom-IN)
+- **Maithili** (mai-IN)
+- **Manipuri** (mni-IN)
+- **Nepali** (ne-IN)
+- **Sanskrit** (sa-IN)
+- **Santali** (sat-IN)
+- **Sindhi** (sd-IN)
+- **Urdu** (ur-IN)
 
 ## Development
 
@@ -175,17 +252,32 @@ The codebase is designed to be modular for future integrations:
 - **Styling**: Utility-first CSS with TailwindCSS
 - **State Management**: Local state with React hooks
 
-### Adding Translation Middleware
-The backend is structured to easily add translation middleware:
+### Translation Service Integration
+The translation service is already integrated and can be configured:
 
 ```javascript
-// Example: Add translation before sending messages
-socket.on('private_message', (data) => {
-  // Add translation logic here
-  const translatedMessage = await translateMessage(data.message, targetLanguage);
-  
+// In translationService.js
+const translationService = require('./translationService');
+
+// Enable real Sarvam-Translate model
+translationService.usePythonScript = true;
+
+// Translate a message
+const result = await translationService.translate(
+  "Hello, how are you?", 
+  "English", 
+  "Hindi"
+);
+```
+
+### Adding New Translation APIs
+The backend is structured to easily add additional translation services:
+
+```javascript
+// Example: Add Google Translate integration
+socket.on('private_message', async (data) => {
+  const translatedMessage = await googleTranslate(data.message, targetLanguage);
   // Send translated message
-  // ... existing code
 });
 ```
 
@@ -197,6 +289,9 @@ socket.on('private_message', (data) => {
 2. **Socket connection errors**: Check if backend server is running
 3. **Username already taken**: Choose a different username
 4. **Messages not sending**: Verify both users are online
+5. **Translation not working**: Check if Python dependencies are installed and `usePythonScript = true` in `translationService.js`
+6. **Python script errors**: Ensure Python 3.8+ is installed and `requirements.txt` dependencies are installed
+7. **Virtual keyboard not showing**: Check if `VirtualKeyboard.js` component is properly imported
 
 ### Debug Mode
 Enable debug logging by setting environment variables:

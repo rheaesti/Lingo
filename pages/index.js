@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import io from 'socket.io-client'
+import VirtualKeyboard from '../components/VirtualKeyboard'
 
 let socket
 
@@ -11,6 +12,29 @@ export default function LoginPage() {
   const [selectedLanguage, setSelectedLanguage] = useState('English')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false)
+  
+  const usernameInputRef = useRef(null)
+
+  const handleVirtualKeyboardInput = (input) => {
+    setUsername(input)
+    if (usernameInputRef.current) {
+      usernameInputRef.current.value = input
+      // Trigger input event to ensure React detects the change
+      const event = new Event('input', { bubbles: true });
+      usernameInputRef.current.dispatchEvent(event);
+    }
+  }
+
+  const handleVirtualKeyboardKeyPress = (button) => {
+    if (button === '{enter}') {
+      handleSubmit(new Event('submit'))
+    }
+  }
+
+  const toggleVirtualKeyboard = () => {
+    setShowVirtualKeyboard(!showVirtualKeyboard)
+  }
 
   useEffect(() => {
     // Check if user is already logged in
@@ -74,6 +98,7 @@ export default function LoginPage() {
     })
   }
 
+
   return (
     <>
       <Head>
@@ -100,15 +125,28 @@ export default function LoginPage() {
                 <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                   Choose a username
                 </label>
-                <input
-                  type="text"
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  disabled={isLoading}
-                />
+                <div className="relative">
+                  <input
+                    ref={usernameInputRef}
+                    type="text"
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your username..."
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={toggleVirtualKeyboard}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title={`${showVirtualKeyboard ? 'Hide' : 'Show'} Virtual Keyboard`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -204,15 +242,26 @@ export default function LoginPage() {
                 </div>
               </div>
             </div>
-          </div>
+        </div>
 
-          {/* Footer */}
+        {/* Virtual Keyboard */}
+        <VirtualKeyboard
+          language={selectedLanguage}
+          onInputChange={handleVirtualKeyboardInput}
+          onKeyPress={handleVirtualKeyboardKeyPress}
+          inputRef={usernameInputRef}
+          isVisible={showVirtualKeyboard}
+          onToggle={toggleVirtualKeyboard}
+        />
+
+        {/* Footer */}
           <div className="text-center mt-8">
             <p className="text-sm text-gray-500">
               Open multiple tabs to test with different users
             </p>
           </div>
         </div>
+
       </div>
     </>
   )

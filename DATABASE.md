@@ -1,3 +1,4 @@
+commands
 Here’s a clean `DATABASE.md` file that documents the schema you provided for your Supabase chat app:
 
 ---
@@ -110,7 +111,11 @@ Stores all messages exchanged in chat rooms.
 | `id`           | `uuid` (PK)                   | Unique identifier for the message. Defaults to `gen_random_uuid()`. |
 | `chat_room_id` | `uuid` (FK → chat\_rooms.id)  | Chat room where the message belongs.                                |
 | `sender_id`    | `uuid` (FK → users.id)        | The user who sent the message.                                      |
-| `content`      | `text`                        | The message content (text, media URL, etc.).                        |
+| `content`      | `text`                        | The original message content.                                       |
+| `translated_content` | `text` (Nullable)         | The translated message content (if translation occurred).           |
+| `original_language` | `varchar(50)` (Nullable)  | The original language of the message.                               |
+| `translated_language` | `varchar(50)` (Nullable) | The language the message was translated to.                         |
+| `is_translated` | `boolean` (Default: false)    | Whether the message was translated.                                 |
 | `message_type` | `varchar(20)` (Default: text) | Type of message (`text`, `image`, `file`, etc.).                    |
 | `is_read`      | `boolean` (Default: false)    | Whether the message has been read by the recipient.                 |
 | `created_at`   | `timestamptz`                 | Timestamp when the message was created. Defaults to `now()`.        |

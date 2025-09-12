@@ -24,8 +24,12 @@ export default function UsersPage() {
     // Initialize socket connection
     socket = io('http://localhost:5000')
 
-    // Re-login with the stored username
-    socket.emit('user_login', username)
+    // Re-login with the stored username and language
+    const language = localStorage.getItem('selectedLanguage') || 'English'
+    socket.emit('user_login', { 
+      username: username, 
+      preferredLanguage: language 
+    })
 
     // Socket event listeners
     socket.on('connect', () => {

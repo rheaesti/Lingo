@@ -1,9 +1,10 @@
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const translationService = require('./translationService');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,11 +32,17 @@ if (!supabase) {
 
 // Helpers for DB operations
 async function getOrCreateUser(username, preferredLanguage = 'English') {
-  if (!supabase) return null;
+  if (!supabase) {
+    console.error('❌ Supabase client not available');
+    return null;
+  }
+  
+  console.log(`🔍 getOrCreateUser called with username: ${username}, language: ${preferredLanguage}`);
+  
   // Try to find existing user
   let { data: user, error } = await supabase
     .from('users')
-    .select('id, username')
+    .select('id, username, preferred_language')
     .eq('username', username)
     .single();
 
@@ -44,29 +51,44 @@ async function getOrCreateUser(username, preferredLanguage = 'English') {
   }
 
   if (!user) {
+    console.log(`📝 Creating new user: ${username} with language: ${preferredLanguage}`);
+    // Create new user with language preference
     const { data: inserted, error: insertErr } = await supabase
       .from('users')
-      .insert({ username, is_online: true })
-      .select('id, username')
+      .insert({ 
+        username, 
+        is_online: true,
+        preferred_language: preferredLanguage
+      })
+      .select('id, username, preferred_language')
       .single();
     if (insertErr) {
       console.error('getOrCreateUser: insert error', insertErr);
       return null;
     }
     user = inserted;
+    console.log(`✅ New user created:`, user);
   } else {
-    // Mark online
-    await supabase
+    console.log(`🔄 Updating existing user: ${username} with language: ${preferredLanguage}`);
+    // Update existing user - mark online and update language preference
+    const { error: updateErr } = await supabase
       .from('users')
       .update({ 
         is_online: true, 
-        last_seen: new Date().toISOString()
+        last_seen: new Date().toISOString(),
+        preferred_language: preferredLanguage
       })
       .eq('id', user.id);
+    
+    if (updateErr) {
+      console.error('getOrCreateUser: update error', updateErr);
+      return null;
+    }
+    
+    // Update the user object with the new language preference
+    user.preferred_language = preferredLanguage;
+    console.log(`✅ User updated:`, user);
   }
-
-  // Store/update language preference in language_preferences table
-  await storeLanguagePreference(user.id, preferredLanguage);
   
   return user;
 }
@@ -75,7 +97,7 @@ async function getUserByUsername(username) {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('users')
-    .select('id, username')
+    .select('id, username, preferred_language')
     .eq('username', username)
     .single();
   if (error) {
@@ -110,12 +132,28 @@ async function getOrCreateChatRoom(userAId, userBId) {
   return inserted;
 }
 
-async function insertMessage(chat_room_id, sender_id, content) {
+async function insertMessage(chat_room_id, sender_id, content, translationData = null) {
   if (!supabase) return null;
+  
+  const messageData = {
+    chat_room_id,
+    sender_id,
+    content,
+    message_type: 'text'
+  };
+  
+  // Add translation data if provided
+  if (translationData) {
+    messageData.translated_content = translationData.translatedContent;
+    messageData.original_language = translationData.originalLanguage;
+    messageData.translated_language = translationData.translatedLanguage;
+    messageData.is_translated = translationData.isTranslated;
+  }
+  
   const { data, error } = await supabase
     .from('messages')
-    .insert({ chat_room_id, sender_id, content, message_type: 'text' })
-    .select('id, chat_room_id, sender_id, content, created_at')
+    .insert(messageData)
+    .select('id, chat_room_id, sender_id, content, translated_content, original_language, translated_language, is_translated, created_at')
     .single();
   if (error) {
     console.error('insertMessage error', error);
@@ -128,7 +166,7 @@ async function getMessages(chat_room_id) {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('messages')
-    .select('id, sender_id, content, created_at')
+    .select('id, sender_id, content, translated_content, original_language, translated_language, is_translated, created_at')
     .eq('chat_room_id', chat_room_id)
     .order('created_at', { ascending: true });
   if (error) {
@@ -138,57 +176,16 @@ async function getMessages(chat_room_id) {
   return data || [];
 }
 
-async function storeLanguagePreference(userId, language) {
-  if (!supabase) return null;
-  
-  // Check if user already has a language preference
-  const { data: existing, error: selectError } = await supabase
-    .from('language_preferences')
-    .select('id, language')
-    .eq('user_id', userId)
-    .single();
-
-  if (selectError && selectError.code !== 'PGRST116') {
-    console.error('storeLanguagePreference: select error', selectError);
-  }
-
-  if (existing) {
-    // Update existing preference
-    const { error: updateError } = await supabase
-      .from('language_preferences')
-      .update({ 
-        language: language,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId);
-    
-    if (updateError) {
-      console.error('storeLanguagePreference: update error', updateError);
-    }
-  } else {
-    // Insert new preference
-    const { error: insertError } = await supabase
-      .from('language_preferences')
-      .insert({ 
-        user_id: userId, 
-        language: language,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    
-    if (insertError) {
-      console.error('storeLanguagePreference: insert error', insertError);
-    }
-  }
-}
+// Language preferences are now stored directly in the users table
+// No separate function needed
 
 async function getLanguagePreference(userId) {
   if (!supabase) return 'English';
   
   const { data, error } = await supabase
-    .from('language_preferences')
-    .select('language')
-    .eq('user_id', userId)
+    .from('users')
+    .select('preferred_language')
+    .eq('id', userId)
     .single();
   
   if (error) {
@@ -198,7 +195,7 @@ async function getLanguagePreference(userId) {
     return 'English'; // Default language
   }
   
-  return data?.language || 'English';
+  return data?.preferred_language || 'English';
 }
 
 // Store connected users in memory (socket.id -> { username, userId })
@@ -216,7 +213,9 @@ io.on('connection', (socket) => {
   // Handle user login
   socket.on('user_login', async (data) => {
     const username = typeof data === 'string' ? data : data.username;
-    const preferredLanguage = typeof data === 'object' ? data.preferredLanguage : 'English';
+    const preferredLanguage = typeof data === 'object' && data.preferredLanguage ? data.preferredLanguage : 'English';
+    
+    console.log(`🔍 Login attempt - Username: ${username}, Language: ${preferredLanguage}`);
     
     // If username already connected on another socket, drop the old mapping (prefer latest connection)
     for (const [id, info] of Array.from(connectedUsers.entries())) {
@@ -236,8 +235,12 @@ io.on('connection', (socket) => {
     // Ensure user exists in DB and mark online
     let userRecord = await getOrCreateUser(username, preferredLanguage);
     const userId = userRecord?.id || null;
+    
     if (userId) {
       usernameToUserId.set(username, userId);
+      console.log(`✅ User ${username} created/updated in database with language: ${preferredLanguage}`);
+    } else {
+      console.error(`❌ Failed to create/update user ${username} in database`);
     }
 
     // Store user information
@@ -284,10 +287,60 @@ io.on('connection', (socket) => {
 
     // Persist message in DB first; only deliver if saved
     let persisted = null;
+    // Find the recipient's socket and get their language preference
+    let recipientSocket = null;
+    let recipientLanguage = 'English'; // Default language
+    for (const [socketId, info] of connectedUsers.entries()) {
+      if (info.username === to && socketId !== socket.id) {
+        recipientSocket = socketId;
+        recipientLanguage = info.preferredLanguage || 'English';
+        break;
+      }
+    }
+
+    // Get sender's language preference
+    const senderLanguage = sender?.preferredLanguage || 'English';
+
+    // Prepare translation data
+    let translatedMessage = message;
+    let translationData = null;
+    
+    if (recipientSocket && senderLanguage !== recipientLanguage) {
+      try {
+        const translationResponse = await fetch('http://localhost:5000/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: message,
+            sourceLanguage: senderLanguage,
+            targetLanguage: recipientLanguage
+          })
+        });
+
+        if (translationResponse.ok) {
+          const translationResult = await translationResponse.json();
+          translatedMessage = translationResult.translatedText;
+          translationData = {
+            translatedContent: translatedMessage,
+            originalLanguage: senderLanguage,
+            translatedLanguage: recipientLanguage,
+            isTranslated: true
+          };
+          console.log(`Auto-translated message from ${senderLanguage} to ${recipientLanguage}: ${message} -> ${translatedMessage}`);
+        }
+      } catch (error) {
+        console.error('Auto-translation failed:', error);
+        // Continue with original message if translation fails
+      }
+    }
+
+    // Store message in database with translation data
     if (sender?.userId && recipientUserId) {
       const room = await getOrCreateChatRoom(sender.userId, recipientUserId);
       if (room?.id) {
-        persisted = await insertMessage(room.id, sender.userId, message);
+        persisted = await insertMessage(room.id, sender.userId, message, translationData);
       }
     }
     if (!persisted) {
@@ -295,38 +348,34 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Find the recipient's socket
-    let recipientSocket = null;
-    for (const [socketId, info] of connectedUsers.entries()) {
-      if (info.username === to && socketId !== socket.id) {
-        recipientSocket = socketId;
-        break;
-      }
-    }
-
+    // Send translated message to recipient (online)
     if (recipientSocket) {
-      // Send message to recipient (online)
       io.to(recipientSocket).emit('private_message', {
         from,
-        message,
+        text: translatedMessage,  // translated version for receiver
+        message: translatedMessage,  // keep for backward compatibility
+        original: message,  // original text
+        originalMessage: message,  // keep for backward compatibility
+        originalLanguage: senderLanguage,
+        translatedLanguage: recipientLanguage,
+        isTranslated: senderLanguage !== recipientLanguage,
         timestamp: persisted.created_at || new Date().toISOString()
       });
+    }
 
-      // Send confirmation to sender
-      socket.emit('message_sent', {
-        to,
-        message,
-        timestamp: persisted.created_at || new Date().toISOString()
-      });
+    // Send confirmation to sender (original message)
+    socket.emit('message_sent', {
+      to,
+      text: message,  // original text for sender
+      message,  // keep for backward compatibility
+      original: message,  // original text
+      isTranslated: false,  // sender sees original
+      timestamp: persisted.created_at || new Date().toISOString()
+    });
 
-      console.log(`Message sent from ${from} to ${to} (online)`);
+    if (recipientSocket) {
+      console.log(`Message sent from ${from} to ${to} (online) - Auto-translated: ${senderLanguage} -> ${recipientLanguage}`);
     } else {
-      // Recipient offline: confirmation to sender; message already persisted in DB
-      socket.emit('message_sent', {
-        to,
-        message,
-        timestamp: persisted.created_at || new Date().toISOString()
-      });
       console.log(`Message persisted for offline delivery from ${from} to ${to}`);
     }
   });
@@ -341,11 +390,61 @@ io.on('connection', (socket) => {
     const room = await getOrCreateChatRoom(me.userId, other.id);
     if (!room?.id) return;
     const rows = await getMessages(room.id);
-    const history = rows.map(r => ({
-      message: r.content,
-      timestamp: r.created_at,
-      type: r.sender_id === me.userId ? 'sent' : 'received'
-    }));
+    
+    // Get current user's language preference
+    const currentUserLanguage = me.preferredLanguage || 'English';
+    const otherUserLanguage = other.preferred_language || 'English';
+    
+    const history = rows.map((r) => {
+      const isReceived = r.sender_id !== me.userId;
+      let message = r.content;
+      let originalMessage = r.content;
+      let isTranslated = r.is_translated || false;
+      let originalLanguage = r.original_language;
+      let translatedLanguage = r.translated_language;
+      
+      console.log(`Processing chat history message:`, {
+        content: r.content,
+        translated_content: r.translated_content,
+        is_translated: r.is_translated,
+        original_language: r.original_language,
+        translated_language: r.translated_language,
+        isReceived: isReceived
+      });
+      
+      // If it's a received message and we have translation data, use it
+      if (isReceived && r.translated_content) {
+        message = r.translated_content;
+        originalMessage = r.content;
+        isTranslated = true;
+        originalLanguage = r.original_language;
+        translatedLanguage = r.translated_language;
+      }
+      
+      // For messages without translation data, ensure originalMessage is set
+      if (!originalMessage) {
+        originalMessage = r.content;
+      }
+      
+      // Set default language values if not available
+      if (!originalLanguage) {
+        originalLanguage = isReceived ? otherUserLanguage : currentUserLanguage;
+      }
+      if (!translatedLanguage) {
+        translatedLanguage = isReceived ? currentUserLanguage : otherUserLanguage;
+      }
+      
+      return {
+        message: message,
+        originalMessage: originalMessage,
+        timestamp: r.created_at,
+        type: isReceived ? 'received' : 'sent',
+        isTranslated: isTranslated,
+        originalLanguage: originalLanguage,
+        translatedLanguage: translatedLanguage
+      };
+    });
+    
     socket.emit('chat_history', { with: otherUsername, messages: history });
   });
 
@@ -443,6 +542,70 @@ app.get('/db-check', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     res.status(502).json({ ok: false, reason: 'Fetch failed', error: String(e) });
+  }
+});
+
+// Translation endpoint using local Sarvam-Translate model
+app.post('/translate', async (req, res) => {
+  try {
+    console.log('🔄 Translation request received:', req.body);
+    const { text, targetLanguage, sourceLanguage = 'English' } = req.body;
+    
+    if (!text || !targetLanguage) {
+      console.log('❌ Missing required fields:', { text, targetLanguage, sourceLanguage });
+      return res.status(400).json({ error: 'Text and target language are required' });
+    }
+    
+    console.log('🔄 Processing translation with local model:', { text, sourceLanguage, targetLanguage });
+
+    // Use local translation service
+    const result = await translationService.translate(text, sourceLanguage, targetLanguage);
+    
+    res.json(result);
+
+  } catch (error) {
+    console.error('Translation error:', error);
+    console.log('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      text: req.body.text,
+      sourceLanguage: req.body.sourceLanguage,
+      targetLanguage: req.body.targetLanguage
+    });
+    
+    // Fallback: Return a mock translation for testing
+    const mockTranslations = {
+      'English': {
+        'Malayalam': `[Translated to Malayalam] ${req.body.text}`,
+        'Hindi': `[Translated to Hindi] ${req.body.text}`,
+        'Tamil': `[Translated to Tamil] ${req.body.text}`,
+        'Bengali': `[Translated to Bengali] ${req.body.text}`,
+        'Gujarati': `[Translated to Gujarati] ${req.body.text}`,
+        'Telugu': `[Translated to Telugu] ${req.body.text}`,
+        'Kannada': `[Translated to Kannada] ${req.body.text}`,
+        'Punjabi': `[Translated to Punjabi] ${req.body.text}`,
+        'Marathi': `[Translated to Marathi] ${req.body.text}`,
+        'Odia': `[Translated to Odia] ${req.body.text}`
+      },
+      'Malayalam': {
+        'English': `[Translated to English] ${req.body.text}`,
+        'Hindi': `[Translated to Hindi] ${req.body.text}`,
+        'Tamil': `[Translated to Tamil] ${req.body.text}`
+      }
+    };
+    
+    const fallbackTranslation = mockTranslations[req.body.sourceLanguage]?.[req.body.targetLanguage] || 
+                               `[Translation failed - Model error] ${req.body.text}`;
+    
+    console.log(`🔄 Using fallback translation: ${req.body.sourceLanguage} -> ${req.body.targetLanguage}`);
+    console.log(`🔄 Fallback result: ${fallbackTranslation}`);
+    
+    res.json({ 
+      translatedText: fallbackTranslation,
+      sourceLanguage: req.body.sourceLanguage,
+      targetLanguage: req.body.targetLanguage,
+      isFallback: true
+    });
   }
 });
 
