@@ -2,6 +2,129 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile-specific optimizations */
+@layer base {
+  /* Improve touch targets for mobile */
+  button, input, select, textarea {
+    @apply touch-manipulation;
+  }
+  
+  /* Prevent zoom on input focus on iOS */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  
+  /* Smooth scrolling for mobile */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Better mobile viewport handling */
+  body {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* Mobile-friendly button styles */
+  .btn-mobile {
+    @apply min-h-[44px] min-w-[44px] touch-manipulation;
+  }
+  
+  /* Mobile-optimized input styles */
+  .input-mobile {
+    @apply text-base px-4 py-3;
+  }
+  
+  /* Mobile-friendly card styles */
+  .card-mobile {
+    @apply rounded-xl sm:rounded-2xl;
+  }
+  
+  /* Touch feedback for mobile */
+  .touch-feedback {
+    @apply active:scale-95 transition-transform duration-75;
+  }
+  
+  /* Mobile-optimized spacing */
+  .mobile-spacing {
+    @apply space-y-3 sm:space-y-4;
+  }
+  
+  /* Mobile-friendly text sizes */
+  .text-mobile {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-mobile-lg {
+    @apply text-base sm:text-lg;
+  }
+  
+  .text-mobile-xl {
+    @apply text-lg sm:text-xl;
+  }
+}
+
+/* Force light mode - override any dark mode */
+html {
+  color-scheme: light !important;
+}
+
+html.dark {
+  color-scheme: light !important;
+}
+
+/* Ensure light mode backgrounds are always applied */
+html, body {
+  background-color: #f3f4f6 !important; /* gray-100 */
+}
+
+html.dark, html.dark body {
+  background-color: #f3f4f6 !important; /* gray-100 */
+}
+
+/* Ensure text is always readable regardless of theme */
+.text-gray-800, .text-gray-900 {
+  color: #1f2937 !important; /* gray-800 */
+}
+
+.text-gray-600, .text-gray-700 {
+  color: #374151 !important; /* gray-700 */
+}
+
+/* Override dark mode text colors to ensure readability */
+.dark .text-gray-800, .dark .text-gray-900 {
+  color: #1f2937 !important; /* gray-800 - keep dark for contrast */
+}
+
+.dark .text-gray-600, .dark .text-gray-700 {
+  color: #374151 !important; /* gray-700 - keep dark for contrast */
+}
+
+/* Force user cards to always be white */
+.group.bg-white {
+  background-color: #ffffff !important;
+}
+
+.dark .group.bg-white {
+  background-color: #ffffff !important;
+}
+
+/* Force user card borders to be light gray */
+.group.bg-white {
+  border-color: #e5e7eb !important;
+}
+
+.dark .group.bg-white {
+  border-color: #e5e7eb !important;
+}
+
 @layer base {
   html,
   body {
