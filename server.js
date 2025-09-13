@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin: process.env.CORS_ORIGIN || "*",
     methods: ["GET", "POST"]
   }
 });
@@ -21,7 +21,7 @@ app.use(express.json());
 
 // Supabase client (server-side) — use Service Role key only (ignore RLS)
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://lmkejdtxdxmkepfogilj.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxta2VqZHR4ZHhta2VwZm9naWxqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjE3NDQ2MCwiZXhwIjoyMDcxNzUwNDYwfQ.g70mZeLkQM-cnd_t_irrF0-Wwv_xPmk7BqfibQhVEy0"
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxta2VqZHR4ZHhta2VwZm9naWxqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjE3NDQ2MCwiZXhwIjoyMDcxNzUwNDYwfQ.g70mZeLkQM-cnd_t_irrF0-Wwv_xPmk7BqfibQhVEy0";
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -306,7 +306,8 @@ io.on('connection', (socket) => {
     
     if (recipientSocket && senderLanguage !== recipientLanguage) {
       try {
-        const translationResponse = await fetch(`${process.env.TRANSLATION_SERVICE_URL || 'http://localhost:5000'}/translate`, {
+        const translationServiceUrl = process.env.TRANSLATION_SERVICE_URL || 'http://localhost:5000';
+        const translationResponse = await fetch(`${translationServiceUrl}/translate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

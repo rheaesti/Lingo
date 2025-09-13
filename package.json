@@ -7,7 +7,7 @@
     "server": "node server.js",
     "client": "next dev",
     "build": "next build",
-    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "start": "npm run build && concurrently \"npm run server\" \"npm run client\"",
     "start:prod": "concurrently \"npm run server\" \"npm run client\""
   },
   "dependencies": {
