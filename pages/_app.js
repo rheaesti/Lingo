@@ -2,6 +2,7 @@ import '../styles/globals.css'
 import '../styles/virtual-keyboard.css'
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { ThemeProvider } from '../contexts/ThemeContext'
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
@@ -21,5 +22,9 @@ export default function App({ Component, pageProps }) {
     }
   }, [router.pathname])
 
-  return <Component {...pageProps} />
+  return (
+    <ThemeProvider>
+      <Component {...pageProps} />
+    </ThemeProvider>
+  )
 }
