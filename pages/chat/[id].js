@@ -85,7 +85,8 @@ export default function ChatPage() {
 
     // Fetch chat history from server (DB)
     // Server emits 'chat_history' with normalized records
-    socket = io('http://localhost:5000')
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'
+    socket = io(serverUrl)
 
     // Re-login with the stored username and language (this will handle duplicate connections)
     socket.emit('user_login', { 

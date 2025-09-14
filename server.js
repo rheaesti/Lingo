@@ -307,7 +307,8 @@ io.on('connection', (socket) => {
     if (recipientSocket && senderLanguage !== recipientLanguage) {
       try {
         // Use local translation service for now
-        const translationResponse = await fetch('http://localhost:5000/translate', {
+        const translationServiceUrl = process.env.TRANSLATION_SERVICE_URL || 'http://localhost:5000'
+        const translationResponse = await fetch(`${translationServiceUrl}/translate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

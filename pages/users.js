@@ -23,7 +23,8 @@ export default function UsersPage() {
     setCurrentUser(username)
 
     // Initialize socket connection
-    socket = io('http://localhost:5000')
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'
+    socket = io(serverUrl)
 
     // Re-login with the stored username and language
     const language = localStorage.getItem('selectedLanguage') || 'English'

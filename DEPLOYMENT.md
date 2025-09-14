@@ -25,6 +25,7 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 CORS_ORIGIN=https://your-railway-domain.railway.app
 TRANSLATION_SERVICE_URL=https://your-railway-domain.railway.app
+NEXT_PUBLIC_SERVER_URL=https://your-railway-domain.railway.app
 NODE_ENV=production
 PORT=5000
 ```

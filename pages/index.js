@@ -60,12 +60,13 @@ export default function LoginPage() {
     setError('')
 
     // Initialize socket connection
-    socket = io('http://localhost:5000', { timeout: 3000, reconnectionAttempts: 2 })
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'
+    socket = io(serverUrl, { timeout: 3000, reconnectionAttempts: 2 })
 
     // Connection error handlers
     socket.on('connect_error', (err) => {
       console.error('Socket connect_error:', err?.message || err)
-      setError('Cannot reach server at http://localhost:5000')
+      setError(`Cannot reach server at ${serverUrl}`)
       setIsLoading(false)
       socket.disconnect()
     })
