@@ -490,7 +490,13 @@ io.on('connection', (socket) => {
     }
 
     // Resolve sender/recipient users
-    const sender = connectedUsers.get(socket.id) || { username: from, userId: usernameToUserId.get(from) };
+    const sender = connectedUsers.get(socket.id);
+    if (!sender?.userId) {
+      console.error('❌ Sender not properly authenticated for private message');
+      socket.emit('message_error', 'User not authenticated');
+      return;
+    }
+    
     let recipientUserId = usernameToUserId.get(to);
     if (!recipientUserId) {
       const found = await getUserByUsername(to);
@@ -703,7 +709,10 @@ io.on('connection', (socket) => {
   // Handle getting previous contacts
   socket.on('get_previous_contacts', async () => {
     const info = connectedUsers.get(socket.id);
+    console.log(`🔍 Getting previous contacts for user: ${info?.username} (ID: ${info?.userId})`);
+    
     if (!info?.userId) {
+      console.log('❌ User not authenticated for previous contacts');
       socket.emit('contacts_error', 'User not authenticated');
       return;
     }
@@ -722,6 +731,8 @@ io.on('connection', (socket) => {
         `)
         .or(`user1_id.eq.${info.userId},user2_id.eq.${info.userId}`)
         .order('created_at', { ascending: false });
+
+      console.log(`📊 Found ${chatRooms?.length || 0} chat rooms for user ${info.username}`);
 
       if (roomsError) {
         console.error('Error fetching chat rooms:', roomsError);

@@ -49,21 +49,32 @@ export default function UsersPage() {
     // Socket event listeners
     socket.on('connect', () => {
       setIsConnected(true)
-      // Fetch previous contacts when connected
-      socket.emit('get_previous_contacts')
+      // Re-authenticate user and fetch previous contacts when connected
+      const username = localStorage.getItem('username')
+      if (username) {
+        // Use user_login for now to maintain compatibility
+        socket.emit('user_login', { username, language: selectedLanguage || 'English' })
+      }
     })
 
     socket.on('disconnect', () => {
       setIsConnected(false)
     })
 
+    socket.on('login_success', () => {
+      // Fetch previous contacts after successful login
+      socket.emit('get_previous_contacts')
+    })
+
     socket.on('previous_contacts', (contactsList) => {
-      console.log('Previous contacts received:', contactsList)
+      console.log('📨 Previous contacts received:', contactsList)
+      console.log('📊 Number of contacts:', contactsList?.length || 0)
       setContacts(contactsList)
       setIsLoadingContacts(false)
       
       // If no previous contacts, show online users instead
       if (contactsList.length === 0) {
+        console.log('🔄 No previous contacts found, switching to online users view')
         setShowOnlineUsers(true)
       }
     })

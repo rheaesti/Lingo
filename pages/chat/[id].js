@@ -104,6 +104,11 @@ export default function ChatPage() {
     // Socket event listeners
     socket.on('connect', () => {
       setIsConnected(true)
+      // Re-authenticate user when connected
+      const username = localStorage.getItem('username')
+      if (username) {
+        socket.emit('user_login', { username, language: language || 'English' })
+      }
     })
 
     socket.on('disconnect', () => {
