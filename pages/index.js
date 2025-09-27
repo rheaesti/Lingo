@@ -350,12 +350,6 @@ export default function SignupPage() {
           onToggle={toggleVirtualKeyboard}
         />
 
-        {/* Footer */}
-          <div className="text-center mt-8">
-            <p className="text-sm text-gray-500">
-              {t('open_multiple_tabs')}
-            </p>
-          </div>
         </div>
 
       </div>

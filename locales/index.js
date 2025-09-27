@@ -72,7 +72,11 @@ const translations = {
     
     // Users page
     'online_users': 'Online Users',
+    'previous_contacts': 'Previous Chat',
+    'your_conversation_history': 'Your conversation history',
+    'click_contact_to_continue': 'Click on a chat to continue',
     'no_users_online': 'No users online',
+    'no_contacts': 'No chats',
     'select_user_to_chat': 'Select a user to start chatting',
     'refresh_users': 'Refresh Users',
     'sign_out': 'Sign Out',
@@ -185,11 +189,11 @@ const translations = {
     
     // Users page
     'online_users': 'ഓൺലൈൻ ഉപയോക്താക്കൾ',
-    'previous_contacts': 'മുൻ കോൺടാക്റ്റുകൾ',
+    'previous_contacts': 'മുൻ ചാറ്റ്',
     'your_conversation_history': 'നിങ്ങളുടെ സംഭാഷണ ചരിത്രം',
-    'click_contact_to_continue': 'തുടരാൻ ഒരു കോൺടാക്റ്റിൽ ക്ലിക്ക് ചെയ്യുക',
+    'click_contact_to_continue': 'തുടരാൻ ഒരു ചാറ്റിൽ ക്ലിക്ക് ചെയ്യുക',
     'no_users_online': 'ഓൺലൈനിൽ ഉപയോക്താക്കളില്ല',
-    'no_contacts': 'കോൺടാക്റ്റുകളില്ല',
+    'no_contacts': 'ചാറ്റുകളില്ല',
     'start_new_conversation': 'പുതിയ സംഭാഷണം ആരംഭിക്കുക',
     'select_user_to_chat': 'ചാറ്റ് ആരംഭിക്കാൻ ഒരു ഉപയോക്താവിനെ തിരഞ്ഞെടുക്കുക',
     'connect_with_users': 'റിയൽ ടൈമിൽ മറ്റ് ഉപയോക്താക്കളുമായി ബന്ധപ്പെടുക',
@@ -310,11 +314,11 @@ const translations = {
     
     // Users page
     'online_users': 'ऑनलाइन उपयोगकर्ता',
-    'previous_contacts': 'पिछले संपर्क',
+    'previous_contacts': 'पिछली चैट',
     'your_conversation_history': 'आपका बातचीत का इतिहास',
-    'click_contact_to_continue': 'जारी रखने के लिए किसी संपर्क पर क्लिक करें',
+    'click_contact_to_continue': 'जारी रखने के लिए किसी चैट पर क्लिक करें',
     'no_users_online': 'कोई उपयोगकर्ता ऑनलाइन नहीं',
-    'no_contacts': 'कोई संपर्क नहीं',
+    'no_contacts': 'कोई चैट नहीं',
     'start_new_conversation': 'नई बातचीत शुरू करें',
     'select_user_to_chat': 'चैट शुरू करने के लिए एक उपयोगकर्ता चुनें',
     'connect_with_users': 'रियल टाइम में अन्य उपयोगकर्ताओं के साथ जुड़ें',

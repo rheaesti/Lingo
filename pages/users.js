@@ -298,31 +298,27 @@ export default function UsersPage() {
                 <p className="text-gray-600 dark:text-gray-400">{t('loading')}...</p>
               </div>
             ) : (showOnlineUsers ? onlineUsers.length === 0 : contacts.length === 0) ? (
-              <div className="text-center py-20">
-                <div className="relative mb-8">
-                  <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center shadow-lg">
-                    <svg className="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {/* Placeholder grey cards */}
+                {[...Array(6)].map((_, index) => (
+                  <div
+                    key={index}
+                    className="bg-gray-100 dark:bg-gray-800 rounded-xl p-6 shadow-lg opacity-40"
+                  >
+                    <div className="flex items-center space-x-4 mb-4">
+                      <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                    </div>
+                    <div className="mt-4 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
                   </div>
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                  {showOnlineUsers ? t('no_users_online') : t('no_contacts')}
-                </h3>
-                <p className="text-gray-700 dark:text-gray-200 mb-8 text-lg max-w-md mx-auto">
-                  {showOnlineUsers ? t('only_one_online') : t('start_new_conversation')}. {t('invite_friends')}!
-                </p>
-                <div className="inline-flex items-center px-6 py-3 bg-green-500 text-white rounded-2xl shadow-lg hover:bg-green-600 hover:shadow-xl transition-all duration-200 hover:scale-105">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="font-medium">{t('open_multiple_tabs')}</span>
-                </div>
+                ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
