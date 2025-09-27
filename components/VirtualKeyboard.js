@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Keyboard from 'react-simple-keyboard';
 import 'react-simple-keyboard/build/css/index.css';
+import { useTranslation } from '../hooks/useTranslation';
 
 const VirtualKeyboard = ({ 
   language = 'English', 
@@ -12,6 +13,8 @@ const VirtualKeyboard = ({
 }) => {
   const [keyboard, setKeyboard] = useState(null);
   const [input, setInput] = useState('');
+  const [keyboardMode, setKeyboardMode] = useState('text'); // 'text' or 'emoji'
+  const { t } = useTranslation(language);
 
   // Language-specific keyboard layouts
   const getKeyboardLayout = (lang) => {
@@ -120,6 +123,31 @@ const VirtualKeyboard = ({
     return layouts[lang] || layouts['English'];
   };
 
+  // Emoji keyboard layout
+  const getEmojiLayout = () => {
+    return {
+      default: [
+        '😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚',
+        '😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣',
+        '😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗',
+        '🤔 🤭 🤫 🤥 😶 😐 😑 😬 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😵 🤐',
+        '🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠 😈 👿 👹 👺 🤡 💩 👻 💀 ☠️ 👽 👾',
+        '🤖 🎃 😺 😸 😹 😻 😼 😽 🙀 😿 😾 👶 👧 🧒 👦 👩 🧑 👨 👵 🧓',
+        '👴 👲 👳‍♀️ 👳‍♂️ 🧕 👮‍♀️ 👮‍♂️ 👷‍♀️ 👷‍♂️ 💂‍♀️ 💂‍♂️ 🕵️‍♀️ 🕵️‍♂️ 👩‍⚕️ 👨‍⚕️ 👩‍🌾 👨‍🌾',
+        '👩‍🍳 👨‍🍳 👩‍🎓 👨‍🎓 👩‍🎤 👨‍🎤 👩‍🏫 👨‍🏫 👩‍🏭 👨‍🏭 👩‍💻 👨‍💻 👩‍💼 👨‍💼 👩‍🔧 👨‍🔧 👩‍🔬 👨‍🔬 👩‍🎨 👨‍🎨',
+        '👩‍🚒 👨‍🚒 👩‍✈️ 👨‍✈️ 👩‍🚀 👨‍🚀 👩‍⚖️ 👨‍⚖️ 👰 🤵 👸 🤴 🦸‍♀️ 🦸‍♂️ 🦹‍♀️ 🦹‍♂️ 🤶 🎅 🧙‍♀️ 🧙‍♂️',
+        '🧝‍♀️ 🧝‍♂️ 🧛‍♀️ 🧛‍♂️ 🧟‍♀️ 🧟‍♂️ 🧞‍♀️ 🧞‍♂️ 🧜‍♀️ 🧜‍♂️ 🧚‍♀️ 🧚‍♂️ 👼 🤰 🤱 🙇‍♀️ 🙇‍♂️ 💁‍♀️ 💁‍♂️ 🙅‍♀️ 🙅‍♂️',
+        '🙆‍♀️ 🙆‍♂️ 🙋‍♀️ 🙋‍♂️ 🧏‍♀️ 🧏‍♂️ 🤦‍♀️ 🤦‍♂️ 🤷‍♀️ 🤷‍♂️ 🙎‍♀️ 🙎‍♂️ 🙍‍♀️ 🙍‍♂️ 💇‍♀️ 💇‍♂️ 💆‍♀️ 💆‍♂️ 🧖‍♀️ 🧖‍♂️',
+        '💅 🤳 💃 🕺 👯‍♀️ 👯‍♂️ 🕴 👩‍🦽 👨‍🦽 👩‍🦼 👨‍🦼 🚶‍♀️ 🚶‍♂️ 👩‍🦯 👨‍🦯 🧎‍♀️ 🧎‍♂️ 🏃‍♀️ 🏃‍♂️ 🧍‍♀️ 🧍‍♂️',
+        '👫 👬 👭 💑 👩‍❤️‍👩 👨‍❤️‍👨 💏 👩‍❤️‍💋‍👩 👨‍❤️‍💋‍👨 👪 👨‍👩‍👧 👨‍👩‍👧‍👦 👨‍👩‍👦‍👦 👨‍👩‍👧‍👧 👩‍👩‍👦 👩‍👩‍👧 👩‍👩‍👧‍👦 👩‍👩‍👦‍👦 👩‍👩‍👧‍👧 👨‍👨‍👦 👨‍👨‍👧',
+        '👨‍👨‍👧‍👦 👨‍👨‍👦‍👦 👨‍👨‍👧‍👧 👩‍👦 👩‍👧 👩‍👧‍👦 👩‍👦‍👦 👩‍👧‍👧 👨‍👦 👨‍👧 👨‍👧‍👦 👨‍👦‍👦 👨‍👧‍👧 🤲 👐 🙌 👏 🤝 👍 👎 👊 ✊ 🤛 🤜',
+        '👈 👉 👆 🖕 👇 ☝️ ✋ 🤚 🖐 🖖 👋 🤙 💪 🦾 🦿 🦵 🦶 👂 🦻 👃 🧠',
+        '🦷 🦴 👀 👁 👅 👄 💋 🩸 {bksp}',
+        '{tab} {space} {enter}'
+      ]
+    };
+  };
+
   const onChange = (input) => {
     setInput(input);
     if (onInputChange) {
@@ -139,6 +167,14 @@ const VirtualKeyboard = ({
     }
   };
 
+  const toggleKeyboardMode = () => {
+    setKeyboardMode(keyboardMode === 'text' ? 'emoji' : 'text');
+  };
+
+  const getCurrentLayout = () => {
+    return keyboardMode === 'emoji' ? getEmojiLayout() : getKeyboardLayout(language);
+  };
+
   useEffect(() => {
     if (keyboard && inputRef?.current) {
       const currentValue = inputRef.current.value;
@@ -156,6 +192,15 @@ const VirtualKeyboard = ({
     }
   }, [keyboard, input]);
 
+  // Update keyboard layout when mode changes
+  useEffect(() => {
+    if (keyboard) {
+      keyboard.setOptions({
+        layout: getCurrentLayout()
+      });
+    }
+  }, [keyboardMode, language, keyboard]);
+
   const onInit = (keyboardInstance) => {
     setKeyboard(keyboardInstance);
   };
@@ -166,12 +211,26 @@ const VirtualKeyboard = ({
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 max-h-80 overflow-y-auto">
       <div className="max-w-4xl mx-auto p-4">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-gray-700">
-            Virtual Keyboard - {language}
-          </h3>
+          <div className="flex items-center space-x-3">
+            <h3 className="text-sm font-medium text-gray-700">
+              {t('virtual_keyboard')} - {keyboardMode === 'emoji' ? t('emojis') : language}
+            </h3>
+            <button
+              onClick={toggleKeyboardMode}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                keyboardMode === 'emoji'
+                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+              }`}
+              title={keyboardMode === 'text' ? t('switch_to_emoji_keyboard') : t('switch_to_text_keyboard')}
+            >
+              {keyboardMode === 'text' ? '😀' : '⌨️'}
+            </button>
+          </div>
           <button
             onClick={onToggle}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+            title={t('close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -181,7 +240,7 @@ const VirtualKeyboard = ({
         <div className="keyboard-container">
           <Keyboard
             onInit={onInit}
-            layout={getKeyboardLayout(language)}
+            layout={getCurrentLayout()}
             onChange={onChange}
             onKeyPress={onKeyPress}
             theme="hg-theme-default hg-theme-ios"

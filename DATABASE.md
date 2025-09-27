@@ -18,6 +18,7 @@ Stores user account information.
 | ------------ | -------------------------- | ---------------------------------------------------------------- |
 | `id`         | `uuid` (PK)                | Unique identifier for the user. Defaults to `gen_random_uuid()`. |
 | `username`   | `varchar(50)` (Unique)     | Display name chosen by the user. Must be unique.                 |
+| `password`   | `varchar(255)`             | Hashed password for user authentication.                        |
 | `email`      | `varchar(255)` (Nullable)  | Email address of the user (optional).                            |
 | `avatar_url` | `text` (Nullable)          | URL of the user's avatar/profile picture.                        |
 | `is_online`  | `boolean` (Default: false) | Indicates if the user is currently online.                       |

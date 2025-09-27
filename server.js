@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
 const { createClient } = require('@supabase/supabase-js');
 const translationService = require('./translationService');
 
@@ -30,6 +31,110 @@ if (!supabase) {
 }
 
 // Helpers for DB operations
+async function createUser(username, password, preferredLanguage = 'English') {
+  if (!supabase) {
+    console.error('❌ Supabase client not available');
+    return null;
+  }
+  
+  console.log(`🔍 createUser called with username: ${username}, language: ${preferredLanguage}`);
+  
+  // Check if user already exists
+  const { data: existingUser, error: checkError } = await supabase
+    .from('users')
+    .select('id, username')
+    .eq('username', username)
+    .single();
+
+  if (existingUser) {
+    console.log(`❌ User ${username} already exists`);
+    return { error: 'Username already exists' };
+  }
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('createUser: check error', checkError);
+    return { error: 'Database error' };
+  }
+
+  // Hash the password
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+  
+  console.log(`📝 Creating new user: ${username} with language: ${preferredLanguage}`);
+  // Create new user with password and language preference
+  const { data: inserted, error: insertErr } = await supabase
+    .from('users')
+    .insert({ 
+      username, 
+      password: hashedPassword,
+      is_online: true,
+      preferred_language: preferredLanguage
+    })
+    .select('id, username, preferred_language')
+    .single();
+    
+  if (insertErr) {
+    console.error('createUser: insert error', insertErr);
+    return { error: 'Failed to create user' };
+  }
+  
+  console.log(`✅ New user created:`, inserted);
+  return inserted;
+}
+
+async function authenticateUser(username, password) {
+  if (!supabase) {
+    console.error('❌ Supabase client not available');
+    return null;
+  }
+  
+  console.log(`🔍 authenticateUser called with username: ${username}`);
+  
+  // Find user by username
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, username, password, preferred_language')
+    .eq('username', username)
+    .single();
+
+  if (error) {
+    if (error.code !== 'PGRST116') {
+      console.error('authenticateUser: select error', error);
+    }
+    return { error: 'User not found' };
+  }
+
+  if (!user) {
+    return { error: 'User not found' };
+  }
+
+  // Verify password
+  const isValidPassword = await bcrypt.compare(password, user.password);
+  if (!isValidPassword) {
+    console.log(`❌ Invalid password for user: ${username}`);
+    return { error: 'Invalid password' };
+  }
+
+  // Update user as online
+  const { error: updateErr } = await supabase
+    .from('users')
+    .update({ 
+      is_online: true, 
+      last_seen: new Date().toISOString()
+    })
+    .eq('id', user.id);
+  
+  if (updateErr) {
+    console.error('authenticateUser: update error', updateErr);
+    // Don't fail authentication if update fails
+  }
+
+  // Return user without password
+  const { password: _, ...userWithoutPassword } = user;
+  console.log(`✅ User authenticated:`, userWithoutPassword);
+  return userWithoutPassword;
+}
+
 async function getOrCreateUser(username, preferredLanguage = 'English') {
   if (!supabase) {
     console.error('❌ Supabase client not available');
@@ -51,7 +156,7 @@ async function getOrCreateUser(username, preferredLanguage = 'English') {
 
   if (!user) {
     console.log(`📝 Creating new user: ${username} with language: ${preferredLanguage}`);
-    // Create new user with language preference
+    // Create new user with language preference (legacy function for backward compatibility)
     const { data: inserted, error: insertErr } = await supabase
       .from('users')
       .insert({ 
@@ -209,7 +314,118 @@ const offlineMessages = new Map();
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Handle user login
+  // Handle user signup
+  socket.on('user_signup', async (data) => {
+    const { username, password, preferredLanguage = 'English' } = data;
+    
+    console.log(`🔍 Signup attempt - Username: ${username}, Language: ${preferredLanguage}`);
+    
+    // If username already connected on another socket, drop the old mapping
+    for (const [id, info] of Array.from(connectedUsers.entries())) {
+      if (info.username === username && id !== socket.id) {
+        connectedUsers.delete(id);
+        try { io.to(id).disconnect(true); } catch {}
+      }
+    }
+
+    // Remove any existing entry for this socket
+    const oldInfo = connectedUsers.get(socket.id);
+    if (oldInfo?.username) {
+      usernames.delete(oldInfo.username);
+    }
+
+    // Create new user with password
+    const result = await createUser(username, password, preferredLanguage);
+    
+    if (result.error) {
+      socket.emit('signup_error', result.error);
+      return;
+    }
+
+    if (!result) {
+      socket.emit('signup_error', 'Failed to create user');
+      return;
+    }
+
+    const userId = result.id;
+    usernameToUserId.set(username, userId);
+    console.log(`✅ User ${username} created in database with language: ${preferredLanguage}`);
+
+    // Store user information
+    connectedUsers.set(socket.id, { username, userId, preferredLanguage });
+    usernames.add(username);
+
+    // Emit signup success
+    socket.emit('signup_success', username);
+
+    // Broadcast updated users list to all clients
+    const usersList = Array.from(usernames);
+    io.emit('users_list_update', usersList);
+
+    // Broadcast new user joined
+    socket.broadcast.emit('user_joined', username);
+
+    console.log(`User ${username} signed up on socket ${socket.id} with language preference: ${preferredLanguage}`);
+  });
+
+  // Handle user signin
+  socket.on('user_signin', async (data) => {
+    const { username, password } = data;
+    
+    console.log(`🔍 Signin attempt - Username: ${username}`);
+    
+    // If username already connected on another socket, drop the old mapping
+    for (const [id, info] of Array.from(connectedUsers.entries())) {
+      if (info.username === username && id !== socket.id) {
+        connectedUsers.delete(id);
+        try { io.to(id).disconnect(true); } catch {}
+      }
+    }
+
+    // Remove any existing entry for this socket
+    const oldInfo = connectedUsers.get(socket.id);
+    if (oldInfo?.username) {
+      usernames.delete(oldInfo.username);
+    }
+
+    // Authenticate user
+    const result = await authenticateUser(username, password);
+    
+    if (result.error) {
+      socket.emit('signin_error', result.error);
+      return;
+    }
+
+    if (!result) {
+      socket.emit('signin_error', 'Authentication failed');
+      return;
+    }
+
+    const userId = result.id;
+    const preferredLanguage = result.preferred_language || 'English';
+    usernameToUserId.set(username, userId);
+    console.log(`✅ User ${username} authenticated with language: ${preferredLanguage}`);
+
+    // Store user information
+    connectedUsers.set(socket.id, { username, userId, preferredLanguage });
+    usernames.add(username);
+
+    // Emit signin success
+    socket.emit('signin_success', { username, preferredLanguage });
+
+    // Broadcast updated users list to all clients
+    const usersList = Array.from(usernames);
+    io.emit('users_list_update', usersList);
+
+    // Broadcast user joined (only if it's actually a new connection)
+    if (!oldInfo?.username || oldInfo.username !== username) {
+      socket.broadcast.emit('user_joined', username);
+    }
+
+    console.log(`User ${username} signed in on socket ${socket.id} with language preference: ${preferredLanguage}`);
+  });
+
+  // Handle user login (legacy - for backward compatibility)
   socket.on('user_login', async (data) => {
     const username = typeof data === 'string' ? data : data.username;
     const preferredLanguage = typeof data === 'object' && data.preferredLanguage ? data.preferredLanguage : 'English';
@@ -481,6 +697,75 @@ io.on('connection', (socket) => {
 
     if (recipientSocket) {
       io.to(recipientSocket).emit('typing_stop', { from });
+    }
+  });
+
+  // Handle getting previous contacts
+  socket.on('get_previous_contacts', async () => {
+    const info = connectedUsers.get(socket.id);
+    if (!info?.userId) {
+      socket.emit('contacts_error', 'User not authenticated');
+      return;
+    }
+
+    try {
+      // Get all chat rooms where this user is a participant
+      const { data: chatRooms, error: roomsError } = await supabase
+        .from('chat_rooms')
+        .select(`
+          id,
+          user1_id,
+          user2_id,
+          created_at,
+          user1:users!chat_rooms_user1_id_fkey(username, is_online, last_seen),
+          user2:users!chat_rooms_user2_id_fkey(username, is_online, last_seen)
+        `)
+        .or(`user1_id.eq.${info.userId},user2_id.eq.${info.userId}`)
+        .order('created_at', { ascending: false });
+
+      if (roomsError) {
+        console.error('Error fetching chat rooms:', roomsError);
+        socket.emit('contacts_error', 'Failed to fetch contacts');
+        return;
+      }
+
+      // Get the most recent message for each chat room
+      const contactsWithLastMessage = await Promise.all(
+        chatRooms.map(async (room) => {
+          const otherUser = room.user1_id === info.userId ? room.user2 : room.user1;
+          const otherUserId = room.user1_id === info.userId ? room.user2_id : room.user1_id;
+          
+          // Get the most recent message in this chat room
+          const { data: lastMessage, error: messageError } = await supabase
+            .from('messages')
+            .select('content, created_at, sender_id')
+            .eq('chat_room_id', room.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            username: otherUser.username,
+            isOnline: otherUser.is_online,
+            lastSeen: otherUser.last_seen,
+            lastMessage: lastMessage?.content || '',
+            lastMessageTime: lastMessage?.created_at || room.created_at,
+            isLastMessageFromMe: lastMessage?.sender_id === info.userId,
+            chatRoomId: room.id
+          };
+        })
+      );
+
+      // Sort by last message time (most recent first)
+      contactsWithLastMessage.sort((a, b) => 
+        new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
+      );
+
+      socket.emit('previous_contacts', contactsWithLastMessage);
+      console.log(`✅ Sent ${contactsWithLastMessage.length} previous contacts to ${info.username}`);
+    } catch (error) {
+      console.error('Error fetching previous contacts:', error);
+      socket.emit('contacts_error', 'Failed to fetch contacts');
     }
   });
 

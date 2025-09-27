@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import io from 'socket.io-client'
 import VirtualKeyboard from '../../components/VirtualKeyboard'
+import { useTranslation } from '../../hooks/useTranslation'
 
 let socket
 
@@ -19,6 +20,9 @@ export default function ChatPage() {
   const [chatHistory, setChatHistory] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('English')
   const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false)
+  
+  // Initialize translation hook
+  const { t, currentLanguage, changeLanguage } = useTranslation(selectedLanguage)
   
   const messagesEndRef = useRef(null)
   const typingTimeoutRef = useRef(null)
@@ -81,6 +85,7 @@ export default function ChatPage() {
     setCurrentUser(username)
     if (language) {
       setSelectedLanguage(language)
+      changeLanguage(language)
     }
 
     // Fetch chat history from server (DB)
@@ -339,7 +344,7 @@ export default function ChatPage() {
                   <div className="min-w-0 flex-1">
                     <h1 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white truncate">{chatPartner}</h1>
                     <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                      Chat
+                      {t('chat')}
                     </p>
                   </div>
                 </div>
@@ -347,7 +352,7 @@ export default function ChatPage() {
               
               <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
                 <div className="text-right hidden sm:block">
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Chatting with {chatPartner}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{t('chatting_with')} {chatPartner}</p>
                 </div>
                 
                 {messages.length > 0 && (
@@ -355,16 +360,16 @@ export default function ChatPage() {
                     <button
                       onClick={clearChatHistory}
                       className="flex items-center space-x-1 px-2 sm:px-3 py-1 sm:py-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors text-xs sm:text-sm font-medium"
-                      title="Clear chat history"
+                      title={t('clear_chat_history')}
                     >
                       <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
-                      <span className="hidden sm:inline">Clear</span>
+                      <span className="hidden sm:inline">{t('clear')}</span>
                     </button>
                     
                     <span className="inline-flex items-center px-2 sm:px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-xs font-medium">
-                      {messages.length} msg{messages.length !== 1 ? 's' : ''}
+                      {messages.length} {messages.length !== 1 ? t('messages') : t('message')}
                     </span>
                   </>
                 )}
@@ -384,12 +389,12 @@ export default function ChatPage() {
                   </svg>
                 </div>
                 <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  {currentUser === chatPartner ? 'Cannot chat with yourself' : 'Start a conversation'}
+                  {currentUser === chatPartner ? t('cannot_chat_with_yourself') : t('start_conversation')}
                 </h3>
                 <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-4 sm:mb-6 max-w-md mx-auto px-4">
                   {currentUser === chatPartner 
-                    ? 'Please go back and select a different user to chat with.'
-                    : 'Send your first message to begin chatting with ' + chatPartner
+                    ? t('please_go_back')
+                    : t('send_first_message') + ' ' + chatPartner
                   }
                 </p>
                 {currentUser === chatPartner && (
@@ -400,7 +405,7 @@ export default function ChatPage() {
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    Go Back to Users
+                    {t('go_back_to_users')}
                   </button>
                 )}
               </div>
@@ -452,7 +457,7 @@ export default function ChatPage() {
                           <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                         </div>
                         <span className="text-sm text-gray-700 ml-2">
-                          {chatPartner} is typing...
+                          {chatPartner} {t('is_typing')}
                         </span>
                       </div>
                     </div>
@@ -476,7 +481,7 @@ export default function ChatPage() {
                     type="text"
                     value={newMessage}
                     onChange={handleTyping}
-                    placeholder={currentUser === chatPartner ? "Cannot message yourself" : "Type your message..."}
+                    placeholder={currentUser === chatPartner ? t('cannot_message_yourself') : t('type_your_message')}
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm sm:text-base"
                     disabled={!isConnected || currentUser === chatPartner}
                     style={{ zIndex: 10, position: 'relative' }}
@@ -487,7 +492,7 @@ export default function ChatPage() {
                         type="button"
                         onClick={clearInput}
                         className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1"
-                        title="Clear input"
+                        title={t('clear_input')}
                       >
                         <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -497,7 +502,7 @@ export default function ChatPage() {
                         type="button"
                         onClick={emergencyStop}
                         className="text-red-400 hover:text-red-600 transition-colors p-1"
-                        title="Emergency stop"
+                        title={t('emergency_stop')}
                       >
                         <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -509,7 +514,7 @@ export default function ChatPage() {
                 </div>
                 {currentUser === chatPartner && (
                   <div className="absolute inset-0 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-500 text-sm">Cannot message yourself</span>
+                    <span className="text-gray-500 text-sm">{t('cannot_message_yourself')}</span>
                   </div>
                 )}
               </div>
@@ -523,7 +528,7 @@ export default function ChatPage() {
                     ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' 
                     : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 focus:ring-gray-500'
                 }`}
-                title={`${showVirtualKeyboard ? 'Hide' : 'Show'} Virtual Keyboard`}
+                title={showVirtualKeyboard ? t('hide_virtual_keyboard') : t('show_virtual_keyboard')}
               >
                 <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -545,7 +550,7 @@ export default function ChatPage() {
 
         {/* Virtual Keyboard */}
         <VirtualKeyboard
-          language={selectedLanguage}
+          language={currentLanguage}
           onInputChange={handleVirtualKeyboardInput}
           onKeyPress={handleVirtualKeyboardKeyPress}
           inputRef={messageInputRef}
@@ -553,18 +558,6 @@ export default function ChatPage() {
           onToggle={toggleVirtualKeyboard}
         />
 
-        {/* Floating Virtual Keyboard Toggle Button */}
-        {!showVirtualKeyboard && (
-          <button
-            onClick={toggleVirtualKeyboard}
-            className="fixed bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors z-40"
-            title="Show Virtual Keyboard"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-          </button>
-        )}
       </div>
     </>
   )

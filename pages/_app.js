@@ -11,8 +11,8 @@ export default function App({ Component, pageProps }) {
     // Check if user is logged in (has username in localStorage)
     const username = localStorage.getItem('username')
     
-    // If not on login page and no username, redirect to login
-    if (!username && router.pathname !== '/') {
+    // If not on login/signin page and no username, redirect to login
+    if (!username && router.pathname !== '/' && router.pathname !== '/signin') {
       router.push('/')
     }
     

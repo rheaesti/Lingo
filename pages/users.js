@@ -2,19 +2,32 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import io from 'socket.io-client'
+import { useTranslation } from '../hooks/useTranslation'
 
 let socket
 
 export default function UsersPage() {
   const router = useRouter()
-  const [users, setUsers] = useState([])
+  const [contacts, setContacts] = useState([])
+  const [onlineUsers, setOnlineUsers] = useState([])
   const [currentUser, setCurrentUser] = useState('')
   const [isConnected, setIsConnected] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState('English')
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false)
+  const [showOnlineUsers, setShowOnlineUsers] = useState(false)
+  
+  // Initialize translation hook
+  const { t, currentLanguage, changeLanguage } = useTranslation(selectedLanguage)
 
   useEffect(() => {
     // Get current user from localStorage
     const username = localStorage.getItem('username')
+    const storedLanguage = localStorage.getItem('selectedLanguage')
+    if (storedLanguage) {
+      setSelectedLanguage(storedLanguage)
+      changeLanguage(storedLanguage)
+    }
     if (!username) {
       router.push('/')
       return
@@ -36,30 +49,53 @@ export default function UsersPage() {
     // Socket event listeners
     socket.on('connect', () => {
       setIsConnected(true)
+      // Fetch previous contacts when connected
+      socket.emit('get_previous_contacts')
     })
 
     socket.on('disconnect', () => {
       setIsConnected(false)
     })
 
+    socket.on('previous_contacts', (contactsList) => {
+      console.log('Previous contacts received:', contactsList)
+      setContacts(contactsList)
+      setIsLoadingContacts(false)
+      
+      // If no previous contacts, show online users instead
+      if (contactsList.length === 0) {
+        setShowOnlineUsers(true)
+      }
+    })
+
+    socket.on('contacts_error', (error) => {
+      console.error('Error fetching contacts:', error)
+      setIsLoadingContacts(false)
+      // On error, fallback to online users
+      setShowOnlineUsers(true)
+    })
+
+    // Handle online users list
     socket.on('users_list_update', (usersList) => {
-      // Filter out current user and remove duplicates
+      console.log('Users list updated:', usersList)
       const filteredUsers = usersList
         .filter(username => username !== currentUser)
         .filter((username, index, arr) => arr.indexOf(username) === index)
-
-      setUsers(filteredUsers)
+      setOnlineUsers(filteredUsers)
     })
 
     socket.on('user_joined', (username) => {
-      // Only add if it's not the current user and not already in the list
-      if (username !== currentUser && !users.includes(username)) {
-        //setUsers(prev => [...prev, username])
+      // Refresh contacts when a user joins
+      if (isConnected) {
+        socket.emit('get_previous_contacts')
       }
     })
 
     socket.on('user_left', (username) => {
-      setUsers(prev => prev.filter(user => user !== username))
+      // Refresh contacts when a user leaves
+      if (isConnected) {
+        socket.emit('get_previous_contacts')
+      }
     })
 
     return () => {
@@ -88,7 +124,7 @@ export default function UsersPage() {
   return (
     <>
       <Head>
-        <title>Online Users - Lingo</title>
+        <title>{showOnlineUsers ? t('online_users') : t('previous_contacts')} - Lingo</title>
       </Head>
 
       <div className="min-h-screen bg-gray-100">
@@ -149,7 +185,7 @@ export default function UsersPage() {
                   setIsSidebarOpen(false)
                 }}
                 className="w-10 h-10 bg-gray-700 rounded-lg flex items-center justify-center text-gray-300 hover:bg-gray-600 transition-all duration-200 hover:scale-105"
-                title="Settings"
+                title={t('settings')}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -197,10 +233,10 @@ export default function UsersPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h1 className="text-lg sm:text-2xl font-bold text-white truncate">
-                      Welcome, {currentUser}!
+                      {t('welcome')}, {currentUser}!
                     </h1>
                     <p className="text-green-100 text-xs sm:text-sm">
-                      Online Users
+                      {showOnlineUsers ? t('online_users') : t('previous_contacts')}
                     </p>
                   </div>
                 </div>
@@ -222,15 +258,46 @@ export default function UsersPage() {
           <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <div className="text-center mb-8 sm:mb-12">
               <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-4">
-                Online Users
+                {showOnlineUsers ? t('online_users') : t('previous_contacts')}
               </h2>
-              <p className="text-gray-700 dark:text-gray-200 max-w-2xl mx-auto text-sm sm:text-lg px-4">
-                Connect with other users in real-time. Click on any user to start a private conversation.
+              <p className="text-gray-700 dark:text-gray-200 max-w-2xl mx-auto text-sm sm:text-lg px-4 mb-6">
+                {showOnlineUsers ? `${t('connect_with_users')}. ${t('click_user_to_chat')}.` : `${t('your_conversation_history')}. ${t('click_contact_to_continue')}.`}
               </p>
+              
+              {/* Toggle Button */}
+              <div className="flex justify-center">
+                <div className="bg-gray-200 rounded-lg p-1 flex">
+                  <button
+                    onClick={() => setShowOnlineUsers(false)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                      !showOnlineUsers 
+                        ? 'bg-white text-gray-900 shadow-sm' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {t('previous_contacts')}
+                  </button>
+                  <button
+                    onClick={() => setShowOnlineUsers(true)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                      showOnlineUsers 
+                        ? 'bg-white text-gray-900 shadow-sm' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {t('online_users')}
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Users Grid */}
-            {users.length === 0 ? (
+            {/* Contacts/Users Grid */}
+            {isLoadingContacts ? (
+              <div className="text-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">{t('loading')}...</p>
+              </div>
+            ) : (showOnlineUsers ? onlineUsers.length === 0 : contacts.length === 0) ? (
               <div className="text-center py-20">
                 <div className="relative mb-8">
                   <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center shadow-lg">
@@ -244,20 +311,22 @@ export default function UsersPage() {
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No other users online</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                  {showOnlineUsers ? t('no_users_online') : t('no_contacts')}
+                </h3>
                 <p className="text-gray-700 dark:text-gray-200 mb-8 text-lg max-w-md mx-auto">
-                  You're the only one online right now. Invite friends to join the chat!
+                  {showOnlineUsers ? t('only_one_online') : t('start_new_conversation')}. {t('invite_friends')}!
                 </p>
                 <div className="inline-flex items-center px-6 py-3 bg-green-500 text-white rounded-2xl shadow-lg hover:bg-green-600 hover:shadow-xl transition-all duration-200 hover:scale-105">
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="font-medium">Open another tab to test with multiple users</span>
+                  <span className="font-medium">{t('open_multiple_tabs')}</span>
                 </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                {users.map((username, index) => (
+                {showOnlineUsers ? onlineUsers.map((username, index) => (
                   <div
                     key={index}
                     className="group bg-white rounded-xl sm:rounded-2xl border border-gray-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-300 cursor-pointer transform hover:-translate-y-1 active:scale-95"
@@ -276,10 +345,57 @@ export default function UsersPage() {
                       </h3>
                       <div className="flex items-center justify-center space-x-2 mb-4 sm:mb-6">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs sm:text-sm text-green-600 font-semibold">Online</span>
+                        <span className="text-xs sm:text-sm text-green-600 font-semibold">{t('online')}</span>
                       </div>
                       <button className="w-full px-4 sm:px-6 py-2 sm:py-3 bg-green-500 text-white rounded-lg sm:rounded-xl hover:bg-green-600 transition-all duration-200 font-semibold shadow-lg group-hover:shadow-xl group-hover:scale-105 text-sm sm:text-base">
-                        Start Chat
+                        {t('start_chat')}
+                      </button>
+                    </div>
+                  </div>
+                )) : contacts.map((contact, index) => (
+                  <div
+                    key={index}
+                    className="group bg-white rounded-xl sm:rounded-2xl border border-gray-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-300 cursor-pointer transform hover:-translate-y-1 active:scale-95"
+                    onClick={() => startChat(contact.username)}
+                  >
+                    <div className="p-4 sm:p-6">
+                      <div className="flex items-center mb-4">
+                        <div className="relative">
+                          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-500 rounded-full flex items-center justify-center group-hover:bg-green-600 transition-colors shadow-lg">
+                            <span className="text-white font-bold text-lg sm:text-xl">
+                              {contact.username.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          {contact.isOnline && (
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                          )}
+                        </div>
+                        <div className="ml-3 flex-1 min-w-0">
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors truncate">
+                            {contact.username}
+                          </h3>
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-2 h-2 rounded-full ${contact.isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                            <span className="text-xs sm:text-sm text-gray-600 font-medium">
+                              {contact.isOnline ? t('online') : t('offline')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {contact.lastMessage && (
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                            {contact.isLastMessageFromMe ? 'You: ' : ''}{contact.lastMessage}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(contact.lastMessageTime).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <button className="w-full px-4 sm:px-6 py-2 sm:py-3 bg-green-500 text-white rounded-lg sm:rounded-xl hover:bg-green-600 transition-all duration-200 font-semibold shadow-lg group-hover:shadow-xl group-hover:scale-105 text-sm sm:text-base">
+                        {t('start_chat')}
                       </button>
                     </div>
                   </div>

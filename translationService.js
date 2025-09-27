@@ -110,12 +110,24 @@ class TranslationService {
         if (code === 0) {
           try {
             const result = JSON.parse(output);
-            resolve(result);
+            // Check if the result contains actual translation or just fallback
+            if (result.translatedText && !result.translatedText.startsWith('[') && !result.translatedText.includes('Error in model translation')) {
+              resolve(result);
+            } else {
+              // If it's a fallback translation, still use it as it's better than mock
+              resolve(result);
+            }
           } catch (error) {
             reject(new Error('Failed to parse Python script output'));
           }
         } else {
-          reject(new Error(`Python script failed with code ${code}: ${errorOutput}`));
+          // Even if Python script fails, try to parse the output as it might contain fallback translation
+          try {
+            const result = JSON.parse(output);
+            resolve(result);
+          } catch (parseError) {
+            reject(new Error(`Python script failed with code ${code}: ${errorOutput}`));
+          }
         }
       });
 
@@ -161,6 +173,10 @@ class TranslationService {
       if (this.usePythonScript) {
         try {
           result = await this.translateWithPython(text, sourceLanguage, targetLanguage);
+          // Check if we got a meaningful translation
+          if (result.translatedText && result.translatedText.startsWith('[') && result.translatedText.includes(']')) {
+            console.log('⚠️ Python script returned fallback format, but using it anyway');
+          }
         } catch (error) {
           console.log('⚠️ Python script failed, falling back to mock translation');
           result = this.getMockTranslation(text, sourceLanguage, targetLanguage);
