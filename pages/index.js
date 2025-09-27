@@ -142,21 +142,33 @@ export default function SignupPage() {
         <title>{t('create_account')} - Lingo</title>
       </Head>
       
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full">
-          {/* Logo and Title */}
-          <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+      <div className="min-h-screen bg-gray-100">
+        {/* Header */}
+        <header className="bg-green-500 shadow-lg">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
+                  <span className="text-green-500 font-bold text-xl">L</span>
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-white">
+                    Lingo
+                  </h1>
+                  <p className="text-green-100 text-xs sm:text-sm">
+                    {t('create_your_account')}
+                  </p>
+                </div>
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Lingo</h1>
-            <p className="text-gray-600">{t('create_your_account')}</p>
           </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="max-w-md mx-auto px-4 sm:px-6 py-8">
 
           {/* Signup Form */}
-          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-8">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
@@ -283,7 +295,7 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={isLoading || !username.trim() || !password.trim() || !confirmPassword.trim()}
-                className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full px-6 py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
@@ -302,7 +314,7 @@ export default function SignupPage() {
                 {t('already_have_account')}{' '}
                 <button
                   onClick={() => router.push('/signin')}
-                  className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                  className="text-green-600 hover:text-green-700 font-medium transition-colors"
                 >
                   {t('sign_in_here')}
                 </button>
@@ -350,7 +362,7 @@ export default function SignupPage() {
           onToggle={toggleVirtualKeyboard}
         />
 
-        </div>
+        </main>
 
       </div>
     </>
