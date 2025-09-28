@@ -144,11 +144,9 @@ export default function ChatPage() {
         console.log('📥 Final messageData object:', messageData);
         setMessages(prev => [...prev, messageData])
         
-        // If this is an offline message, show a notification
+        // Handle offline messages (now handled differently)
         if (data.type === 'offline') {
           console.log(`Received offline message from ${chatPartner}: ${data.message}`);
-          // Show a special indicator for offline messages
-          alert(`📬 Offline message received from ${chatPartner}: ${data.message}`)
         }
       }
     })
@@ -171,6 +169,13 @@ export default function ChatPage() {
         });
         setMessages(prev => [...prev, messageData])
       }
+    })
+
+    // Handle offline messages notification (single notification)
+    socket.on('offline_messages_delivered', (data) => {
+      console.log('📬 Offline messages delivered:', data.message);
+      // You can show a subtle notification here if needed
+      // For now, just log it to avoid interrupting the user
     })
 
     // Receive DB chat history

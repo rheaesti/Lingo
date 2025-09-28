@@ -335,6 +335,8 @@ async function deliverOfflineMessages(userId, userLanguage, socket) {
       return;
     }
     
+    let hasOfflineMessages = false;
+    
     for (const room of chatRooms || []) {
       // Get recent messages in this room (last 24 hours)
       const { data: messages, error: messagesError } = await supabase
@@ -352,6 +354,8 @@ async function deliverOfflineMessages(userId, userLanguage, socket) {
       for (const message of messages || []) {
         // Skip messages sent by this user (they should see original)
         if (message.sender_id === userId) continue;
+        
+        hasOfflineMessages = true;
         
         // Get sender's language preference
         const { data: sender, error: senderError } = await supabase
@@ -412,7 +416,7 @@ async function deliverOfflineMessages(userId, userLanguage, socket) {
           }
         }
         
-        // Deliver the message to the user
+        // Deliver the message to the user (without offline type to avoid repeated notifications)
         socket.emit('private_message', {
           from: sender.username,
           text: displayText,
@@ -422,12 +426,18 @@ async function deliverOfflineMessages(userId, userLanguage, socket) {
           originalLanguage: senderLanguage,
           translatedLanguage: userLanguage,
           isTranslated: isTranslated,
-          timestamp: message.created_at || new Date().toISOString(),
-          type: 'offline'
+          timestamp: message.created_at || new Date().toISOString()
         });
         
         console.log(`📬 Delivered offline message: "${originalText}" → "${displayText}"`);
       }
+    }
+    
+    // Send a single notification if there were offline messages
+    if (hasOfflineMessages) {
+      socket.emit('offline_messages_delivered', {
+        message: 'You have received offline messages'
+      });
     }
   } catch (error) {
     console.error('Error in deliverOfflineMessages:', error);
