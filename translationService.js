@@ -90,9 +90,8 @@ class TranslationService {
     return new Promise((resolve, reject) => {
       const python = spawn('python', [
         'sarvam_translate.py',
-        '--text', text,
-        '--target-language', targetLanguage,
-        '--source-language', sourceLanguage
+        '--stdin',
+        '--use-fallback'
       ]);
 
       let output = '';
@@ -134,6 +133,16 @@ class TranslationService {
       python.on('error', (error) => {
         reject(error);
       });
+
+      // Send input data via stdin
+      const inputData = {
+        text: text,
+        sourceLanguage: sourceLanguage,
+        targetLanguage: targetLanguage
+      };
+      
+      python.stdin.write(JSON.stringify(inputData));
+      python.stdin.end();
     });
   }
 
