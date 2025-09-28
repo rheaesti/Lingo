@@ -90,8 +90,8 @@ class TranslationService {
     return new Promise((resolve, reject) => {
       const python = spawn('python', [
         'sarvam_translate.py',
-        '--stdin',
-        '--use-fallback'
+        '--stdin'
+        // Removed --use-fallback to try AI model first
       ]);
 
       let output = '';
@@ -159,7 +159,7 @@ class TranslationService {
     const sourceCode = this.languageMap[sourceLanguage];
     const targetCode = this.languageMap[targetLanguage];
 
-    console.log(`🔄 Translating from ${sourceCode} to ${targetCode}`);
+    console.log(`🔄 Translating from ${sourceLanguage} to ${targetLanguage}`);
     if (!sourceCode || !targetCode) {
       throw new Error(`Unsupported language: ${sourceLanguage} or ${targetLanguage}`);
     }
@@ -175,25 +175,23 @@ class TranslationService {
     }
 
     try {
-      console.log(`🔄 Translating from ${sourceLanguage} (${sourceCode}) to ${targetLanguage} (${targetCode})`);
+      console.log(`🔄 Using Sarvam-Translate model: ${sourceLanguage} -> ${targetLanguage}`);
 
       let result;
 
       if (this.usePythonScript) {
         try {
           result = await this.translateWithPython(text, sourceLanguage, targetLanguage);
-          // Check if we got a meaningful translation
-          if (result.translatedText && result.translatedText.startsWith('[') && result.translatedText.includes(']')) {
-            console.log('⚠️ Python script returned fallback format, but using it anyway');
+          console.log(`📋 Translation result:`, result);
+          
+          // Check if we got a meaningful translation from the AI model
+          if (result.translatedText && !result.translatedText.startsWith('[') && result.translatedText !== text) {
+            console.log('✅ AI model translation successful');
+          } else {
+            console.log('⚠️ AI model returned fallback, but using it');
           }
         } catch (error) {
-          console.log('⚠️ Python script failed, falling back to mock translation');
-          result = this.getMockTranslation(text, sourceLanguage, targetLanguage);
-        }
-        
-        // If Python script returned original text (no real translation), use mock
-        if (result.translatedText === text) {
-          console.log('⚠️ Python script returned original text, using mock translation instead');
+          console.log('⚠️ AI model failed, using fallback translation');
           result = this.getMockTranslation(text, sourceLanguage, targetLanguage);
         }
       } else {
