@@ -17,6 +17,7 @@ export default function ChatPage() {
   const [isTyping, setIsTyping] = useState(false)
   const [typingUsers, setTypingUsers] = useState(new Set())
   const [isConnected, setIsConnected] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [chatHistory, setChatHistory] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('English')
   const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false)
@@ -115,6 +116,11 @@ export default function ChatPage() {
       setIsConnected(false)
     })
 
+    socket.on('login_success', () => {
+      console.log('✅ User authenticated successfully in chat page')
+      setIsAuthenticated(true)
+    })
+
     socket.on('private_message', (data) => {
       if (data.from === chatPartner) {
         const messageData = {
@@ -211,7 +217,10 @@ export default function ChatPage() {
   const handleSendMessage = (e) => {
     e.preventDefault()
     
-    if (!newMessage.trim() || !isConnected) return
+    if (!newMessage.trim() || !isConnected || !isAuthenticated) {
+      console.log('❌ Cannot send message - Connected:', isConnected, 'Authenticated:', isAuthenticated)
+      return
+    }
 
     // Prevent self-messaging
     if (currentUser === chatPartner) {
@@ -488,7 +497,7 @@ export default function ChatPage() {
                     onChange={handleTyping}
                     placeholder={currentUser === chatPartner ? t('cannot_message_yourself') : t('type_your_message')}
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm sm:text-base"
-                    disabled={!isConnected || currentUser === chatPartner}
+                    disabled={!isConnected || !isAuthenticated || currentUser === chatPartner}
                     style={{ zIndex: 10, position: 'relative' }}
                   />
                   {newMessage && (
@@ -542,7 +551,7 @@ export default function ChatPage() {
               
               <button
                 type="submit"
-                disabled={!newMessage.trim() || !isConnected || currentUser === chatPartner}
+                disabled={!newMessage.trim() || !isConnected || !isAuthenticated || currentUser === chatPartner}
                 className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg active:scale-95"
               >
                 <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
