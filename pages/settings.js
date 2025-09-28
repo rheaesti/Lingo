@@ -50,7 +50,7 @@ export default function SettingsPage() {
     socket.on('connect', () => {
       setIsConnected(true)
       // Emit user_login to register with server
-      socket.emit('user_login', { username, language: language || 'English' })
+      socket.emit('user_login', { username, preferredLanguage: language || 'English' })
     })
 
     socket.on('disconnect', () => {
@@ -74,7 +74,7 @@ export default function SettingsPage() {
     
     // Emit user_login to update server with new language
     if (socket && currentUser) {
-      socket.emit('user_login', { username: currentUser, language })
+      socket.emit('user_login', { username: currentUser, preferredLanguage: language })
     }
   }
 

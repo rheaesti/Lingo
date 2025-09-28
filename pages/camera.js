@@ -42,7 +42,7 @@ export default function CameraPage() {
     socket.on('connect', () => {
       setIsConnected(true)
       // Emit user_login to register with server
-      socket.emit('user_login', { username, language: 'English' })
+      socket.emit('user_login', { username, preferredLanguage: 'English' })
     })
 
     socket.on('disconnect', () => {

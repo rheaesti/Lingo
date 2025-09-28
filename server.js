@@ -173,15 +173,22 @@ async function getOrCreateUser(username, preferredLanguage = 'English') {
     user = inserted;
     console.log(`✅ New user created:`, user);
   } else {
-    console.log(`🔄 Updating existing user: ${username} - keeping existing language: ${user.preferred_language}`);
-    // Update existing user - mark online but preserve existing language preference
+    console.log(`🔄 Updating existing user: ${username} - updating language from ${user.preferred_language} to ${preferredLanguage}`);
+    // Update existing user - mark online and update language preference if different
+    const updateData = { 
+      is_online: true, 
+      last_seen: new Date().toISOString()
+    };
+    
+    // Update language preference if it's different
+    if (user.preferred_language !== preferredLanguage) {
+      updateData.preferred_language = preferredLanguage;
+      console.log(`🔄 Language preference changed from ${user.preferred_language} to ${preferredLanguage}`);
+    }
+    
     const { error: updateErr } = await supabase
       .from('users')
-      .update({ 
-        is_online: true, 
-        last_seen: new Date().toISOString()
-        // Don't update preferred_language - keep the user's original choice
-      })
+      .update(updateData)
       .eq('id', user.id);
     
     if (updateErr) {
@@ -189,6 +196,8 @@ async function getOrCreateUser(username, preferredLanguage = 'English') {
       return null;
     }
     
+    // Update the user object with new language preference
+    user.preferred_language = preferredLanguage;
     console.log(`✅ User updated:`, user);
   }
   
@@ -308,12 +317,12 @@ const usernameToUserId = new Map();
 // Store offline messages for users (username -> [messages])
 const offlineMessages = new Map();
 
-// Function to translate pending messages when a user comes online
-async function translatePendingMessages(userId, userLanguage, socket) {
+// Function to deliver offline messages when a user comes online
+async function deliverOfflineMessages(userId, userLanguage, socket) {
   if (!supabase) return;
   
   try {
-    console.log(`🔄 Checking for untranslated messages for user ${userId} (${userLanguage})`);
+    console.log(`🔄 Delivering offline messages for user ${userId} (${userLanguage})`);
     
     // Get all chat rooms where this user is a participant
     const { data: chatRooms, error: roomsError } = await supabase
@@ -322,20 +331,21 @@ async function translatePendingMessages(userId, userLanguage, socket) {
       .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
     
     if (roomsError) {
-      console.error('Error fetching chat rooms for translation:', roomsError);
+      console.error('Error fetching chat rooms for offline messages:', roomsError);
       return;
     }
     
     for (const room of chatRooms || []) {
-      // Get messages in this room that need translation
+      // Get recent messages in this room (last 24 hours)
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
-        .select('id, content, sender_id, translated_content, original_language, translated_language, is_translated')
+        .select('id, content, sender_id, translated_content, original_language, translated_language, is_translated, created_at')
         .eq('chat_room_id', room.id)
-        .is('translated_content', null);
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: true });
       
       if (messagesError) {
-        console.error('Error fetching messages for translation:', messagesError);
+        console.error('Error fetching messages for offline delivery:', messagesError);
         continue;
       }
       
@@ -346,7 +356,7 @@ async function translatePendingMessages(userId, userLanguage, socket) {
         // Get sender's language preference
         const { data: sender, error: senderError } = await supabase
           .from('users')
-          .select('preferred_language')
+          .select('preferred_language, username')
           .eq('id', message.sender_id)
           .single();
         
@@ -354,9 +364,19 @@ async function translatePendingMessages(userId, userLanguage, socket) {
         
         const senderLanguage = sender.preferred_language || 'English';
         
-        // Only translate if languages are different
-        if (senderLanguage !== userLanguage) {
-          console.log(`🔄 Translating pending message: ${senderLanguage} → ${userLanguage}`);
+        // Determine what text to show to the user
+        let displayText = message.content;
+        let originalText = message.content;
+        let isTranslated = false;
+        
+        // If the message was translated and the user's language matches the translated language
+        if (message.is_translated && message.translated_language === userLanguage) {
+          displayText = message.translated_content || message.content;
+          isTranslated = true;
+        }
+        // If languages are different but no translation exists, translate it now
+        else if (senderLanguage !== userLanguage) {
+          console.log(`🔄 Translating message for offline delivery: ${senderLanguage} → ${userLanguage}`);
           
           try {
             const translationResponse = await fetch('http://localhost:5000/translate', {
@@ -373,9 +393,11 @@ async function translatePendingMessages(userId, userLanguage, socket) {
             
             if (translationResponse.ok) {
               const translationResult = await translationResponse.json();
+              displayText = translationResult.translatedText;
+              isTranslated = true;
               
               // Update the message with translation data
-              const { error: updateError } = await supabase
+              await supabase
                 .from('messages')
                 .update({
                   translated_content: translationResult.translatedText,
@@ -384,22 +406,38 @@ async function translatePendingMessages(userId, userLanguage, socket) {
                   is_translated: true
                 })
                 .eq('id', message.id);
-              
-              if (updateError) {
-                console.error('Error updating message with translation:', updateError);
-              } else {
-                console.log(`✅ Translated pending message: "${message.content}" → "${translationResult.translatedText}"`);
-              }
             }
           } catch (error) {
-            console.error('Error translating pending message:', error);
+            console.error('Error translating message for offline delivery:', error);
           }
         }
+        
+        // Deliver the message to the user
+        socket.emit('private_message', {
+          from: sender.username,
+          text: displayText,
+          message: displayText,
+          original: originalText,
+          originalMessage: originalText,
+          originalLanguage: senderLanguage,
+          translatedLanguage: userLanguage,
+          isTranslated: isTranslated,
+          timestamp: message.created_at || new Date().toISOString(),
+          type: 'offline'
+        });
+        
+        console.log(`📬 Delivered offline message: "${originalText}" → "${displayText}"`);
       }
     }
   } catch (error) {
-    console.error('Error in translatePendingMessages:', error);
+    console.error('Error in deliverOfflineMessages:', error);
   }
+}
+
+// Function to translate pending messages when a user comes online (legacy)
+async function translatePendingMessages(userId, userLanguage, socket) {
+  // This function is now replaced by deliverOfflineMessages
+  await deliverOfflineMessages(userId, userLanguage, socket);
 }
 
 // Socket.IO connection handling
@@ -567,6 +605,9 @@ io.on('connection', (socket) => {
     // Store user information
     connectedUsers.set(socket.id, { username, userId, preferredLanguage });
     usernames.add(username);
+    
+    // Update the user's language preference in the connected users map
+    console.log(`🔄 Updated connected user ${username} with language: ${preferredLanguage}`);
 
     // Emit login success
     socket.emit('login_success', username);
@@ -625,6 +666,8 @@ io.on('connection', (socket) => {
     // Find the recipient's socket and get their language preference
     let recipientSocket = null;
     let recipientLanguage = 'English'; // Default language
+    
+    // First, try to get language from connected users
     for (const [socketId, info] of connectedUsers.entries()) {
       if (info.username === to && socketId !== socket.id) {
         recipientSocket = socketId;
@@ -632,18 +675,25 @@ io.on('connection', (socket) => {
         break;
       }
     }
+    
+    // If recipient is not connected, fetch their language preference from database
+    if (!recipientSocket && recipientUserId) {
+      recipientLanguage = await getLanguagePreference(recipientUserId);
+      console.log(`🔍 Recipient ${to} is offline, fetched language from DB: ${recipientLanguage}`);
+    }
 
     // Get sender's language preference
     const senderLanguage = sender?.preferredLanguage || 'English';
     
     console.log(`🌍 Language preferences - Sender: ${senderLanguage}, Recipient: ${recipientLanguage}`);
     console.log(`🔍 Recipient socket found: ${!!recipientSocket}, Languages different: ${senderLanguage !== recipientLanguage}`);
+    console.log(`🔍 Translation condition check: senderLanguage !== recipientLanguage = ${senderLanguage !== recipientLanguage}`);
 
     // Prepare translation data
     let translatedMessage = message;
     let translationData = null;
     
-    if (recipientSocket && senderLanguage !== recipientLanguage) {
+    if (senderLanguage !== recipientLanguage) {
       console.log(`🔄 Translation needed: ${senderLanguage} → ${recipientLanguage}`);
       console.log(`📝 Original message: "${message}"`);
       
@@ -687,14 +737,18 @@ io.on('connection', (socket) => {
         // Continue with original message if translation fails
       }
     } else {
-      console.log(`ℹ️ No translation needed - Same language (${senderLanguage}) or recipient offline`);
+      console.log(`ℹ️ No translation needed - Same language (${senderLanguage})`);
     }
 
     // Store message in database with translation data
+    console.log(`🔍 Database storage check - sender.userId: ${sender?.userId}, recipientUserId: ${recipientUserId}`);
     if (sender?.userId && recipientUserId) {
       const room = await getOrCreateChatRoom(sender.userId, recipientUserId);
+      console.log(`🔍 Chat room created/found:`, room);
       if (room?.id) {
+        console.log(`🔍 Inserting message with translation data:`, translationData);
         persisted = await insertMessage(room.id, sender.userId, message, translationData);
+        console.log(`🔍 Message persisted:`, persisted);
       }
     }
     if (!persisted) {

@@ -29,7 +29,7 @@ model = None
 tokenizer = None
 
 def load_model():
-    """Load the Sarvam-Translate model and tokenizer"""
+    """Load the Sarvam-Translate model and tokenizer with full performance"""
     global model, tokenizer
     
     if model is not None and tokenizer is not None:
@@ -40,25 +40,48 @@ def load_model():
         
         model_name = "sarvamai/sarvam-translate"
         
-        # Load tokenizer
+        # Load tokenizer with full performance
         print("Loading tokenizer...", file=sys.stderr)
-        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-        
-        # Load model with memory optimization
-        print("Loading model...", file=sys.stderr)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto" if torch.cuda.is_available() else "cpu",
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name, 
             trust_remote_code=True,
-            low_cpu_mem_usage=True
+            use_fast=True  # Use fast tokenizer for better performance
         )
         
-        print("Model loaded successfully!", file=sys.stderr)
+        # Load model with full performance settings
+        print("Loading model with full performance...", file=sys.stderr)
+        
+        # Clear cache before loading
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        # Determine optimal device and dtype
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+        
+        print(f"Using device: {device}, dtype: {dtype}", file=sys.stderr)
+        
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=dtype,
+            device_map="auto" if torch.cuda.is_available() else None,
+            trust_remote_code=True,
+            low_cpu_mem_usage=False  # Disable memory optimization for full performance
+        )
+        
+        # Move model to device if not using device_map
+        if not torch.cuda.is_available():
+            model = model.to(device)
+        
+        # Set model to evaluation mode
+        model.eval()
+        
+        print("Model loaded successfully with full performance!", file=sys.stderr)
         return model, tokenizer
         
     except Exception as e:
         print(f"Error loading model: {e}", file=sys.stderr)
+        print("Falling back to lightweight translation...", file=sys.stderr)
         # Return None values to indicate failure
         return None, None
 
@@ -89,17 +112,21 @@ def translate_text(text, target_language, model, tokenizer, source_language='Eng
         # Tokenize and move input to model device
         model_inputs = tokenizer([formatted_text], return_tensors="pt").to(model.device)
         
-        # Generate the output with optimized parameters
+        # Generate the output with optimized parameters for full performance
         with torch.no_grad():
             generated_ids = model.generate(
                 **model_inputs,
-                max_new_tokens=512,  # Reduced from 1024 to save memory
+                max_new_tokens=1024,  # Increased for better translations
                 do_sample=True,
-                temperature=0.01,
+                temperature=0.1,  # Slightly higher for more natural translations
+                top_p=0.9,  # Add top-p sampling for better quality
+                top_k=50,  # Add top-k sampling for better quality
                 num_return_sequences=1,
                 pad_token_id=tokenizer.eos_token_id,
                 eos_token_id=tokenizer.eos_token_id,
-                repetition_penalty=1.1
+                repetition_penalty=1.05,  # Reduced for more natural output
+                length_penalty=1.0,  # Add length penalty
+                early_stopping=True  # Stop early when EOS is generated
             )
         
         # Extract only the generated part (excluding input)
@@ -217,12 +244,162 @@ def fallback_translation(text, target_language, source_language='English'):
             },
             'Malayalam': {
                 'hello': 'നമസ്കാരം',
+                'hi': 'ഹായ്',
+                'good morning': 'സുപ്രഭാതം',
+                'good afternoon': 'ഗുഡ് ആഫ്റ്റർനൂൺ',
+                'good evening': 'ഗുഡ് ഈവനിംഗ്',
+                'good night': 'നല്ലത് രാത്രി',
                 'thank you': 'നന്ദി',
+                'thanks': 'നന്ദി',
+                'please': 'ദയവായി',
+                'sorry': 'ക്ഷമിക്കണം',
+                'excuse me': 'ക്ഷമിക്കണം',
                 'yes': 'അതെ',
                 'no': 'ഇല്ല',
+                'okay': 'ശരി',
+                'ok': 'ശരി',
+                # Common question words
+                'what': 'എന്ത്',
+                'how': 'എങ്ങനെ',
+                'when': 'എപ്പോൾ',
+                'where': 'എവിടെ',
+                'why': 'എന്തുകൊണ്ട്',
+                'who': 'ആര്',
+                'which': 'ഏത്',
+                'whose': 'ആരുടെ',
+                'whom': 'ആരെ',
+                # Common verbs
+                'am': 'ആണ്',
+                'is': 'ആണ്',
+                'are': 'ആണ്',
+                'was': 'ആയിരുന്നു',
+                'were': 'ആയിരുന്നു',
+                'be': 'ആകുക',
+                'been': 'ആയിരിക്കുക',
+                'being': 'ആയിരിക്കുന്നു',
+                'have': 'ഉണ്ട്',
+                'has': 'ഉണ്ട്',
+                'had': 'ഉണ്ടായിരുന്നു',
+                'having': 'ഉണ്ടായിരിക്കുന്നു',
+                'do': 'ചെയ്യുക',
+                'does': 'ചെയ്യുന്നു',
+                'did': 'ചെയ്തു',
+                'doing': 'ചെയ്യുന്നു',
+                'done': 'ചെയ്തു',
+                'will': 'ആകും',
+                'would': 'ആകും',
+                'could': 'കഴിയും',
+                'should': 'ചെയ്യണം',
+                'may': 'കഴിയും',
+                'might': 'കഴിയും',
+                'must': 'ചെയ്യണം',
+                'can': 'കഴിയും',
+                'shall': 'ആകും',
+                # Common pronouns
+                'i': 'ഞാൻ',
+                'me': 'എന്നെ',
+                'my': 'എന്റെ',
+                'mine': 'എന്റേത്',
+                'myself': 'ഞാൻ തന്നെ',
+                'we': 'ഞങ്ങൾ',
+                'us': 'ഞങ്ങളെ',
+                'our': 'ഞങ്ങളുടെ',
+                'ours': 'ഞങ്ങളുടേത്',
+                'ourselves': 'ഞങ്ങൾ തന്നെ',
+                'you': 'നിങ്ങൾ',
+                'your': 'നിങ്ങളുടെ',
+                'yours': 'നിങ്ങളുടേത്',
+                'yourself': 'നിങ്ങൾ തന്നെ',
+                'yourselves': 'നിങ്ങൾ തന്നെ',
+                'he': 'അവൻ',
+                'him': 'അവനെ',
+                'his': 'അവന്റെ',
+                'himself': 'അവൻ തന്നെ',
+                'she': 'അവൾ',
+                'her': 'അവളെ',
+                'hers': 'അവളുടേത്',
+                'herself': 'അവൾ തന്നെ',
+                'it': 'അത്',
+                'its': 'അതിന്റെ',
+                'itself': 'അത് തന്നെ',
+                'they': 'അവർ',
+                'them': 'അവരെ',
+                'their': 'അവരുടെ',
+                'theirs': 'അവരുടേത്',
+                'themselves': 'അവർ തന്നെ',
+                # Common articles and determiners
+                'a': 'ഒരു',
+                'an': 'ഒരു',
+                'the': 'ആ',
+                'this': 'ഇത്',
+                'that': 'അത്',
+                'these': 'ഇവ',
+                'those': 'അവ',
+                'some': 'ചില',
+                'any': 'ഏതെങ്കിലും',
+                'all': 'എല്ലാം',
+                'every': 'എല്ലാ',
+                'each': 'ഓരോ',
+                'both': 'രണ്ടും',
+                'either': 'ഏതെങ്കിലും',
+                'neither': 'ഏതുമില്ല',
+                'other': 'മറ്റ്',
+                'another': 'മറ്റൊരു',
+                'many': 'നിരവധി',
+                'much': 'വളരെ',
+                'more': 'കൂടുതൽ',
+                'most': 'ഏറ്റവും',
+                'few': 'കുറച്ച്',
+                'little': 'ചെറുത്',
+                'less': 'കുറവ്',
+                'least': 'ഏറ്റവും കുറവ്',
+                'several': 'നിരവധി',
+                'enough': 'മതി',
+                'too': 'വളരെ',
+                'very': 'വളരെ',
+                'quite': 'തികച്ചും',
+                'rather': 'വളരെ',
+                'pretty': 'വളരെ',
+                'so': 'അതിനാൽ',
+                'such': 'അത്തരം',
+                'same': 'ഒരേ',
+                'different': 'വ്യത്യസ്തം',
+                'same': 'ഒരേ',
+                'own': 'സ്വന്തം',
+                'own': 'സ്വന്തം',
                 'good': 'നല്ലത്',
                 'bad': 'മോശം',
-                'water': 'വെള്ളം',
+                'beautiful': 'സുന്ദരം',
+                'ugly': 'വൃത്തികെട്ട',
+                'big': 'വലുത്',
+                'small': 'ചെറുത്',
+                'hot': 'ചൂട്',
+                'cold': 'തണുപ്പ്',
+                'server': 'സെർവർ',
+                'logs': 'ലോഗുകൾ',
+                'test': 'ടെസ്റ്റ്',
+                'message': 'സന്ദേശം',
+                'testing': 'ടെസ്റ്റിംഗ്',
+                'debug': 'ഡീബഗ്',
+                'error': 'പിശക്',
+                'success': 'വിജയം',
+                'welcome': 'സ്വാഗതം',
+                'congratulations': 'അഭിനന്ദനങ്ങൾ',
+                'good luck': 'ആശംസകൾ',
+                'happy birthday': 'ജന്മദിനാശംസകൾ',
+                'merry christmas': 'ക്രിസ്മസ് ആശംസകൾ',
+                'happy new year': 'പുതുവത്സരാശംസകൾ',
+                # Common phrases
+                'how are you': 'നിങ്ങൾ എങ്ങനെയാണ്',
+                'what is your name': 'നിങ്ങളുടെ പേരെന്താണ്',
+                'what is': 'എന്താണ്',
+                'how is': 'എങ്ങനെയാണ്',
+                'where are you': 'നിങ്ങൾ എവിടെയാണ്',
+                'when are you': 'നിങ്ങൾ എപ്പോൾ',
+                'why are you': 'നിങ്ങൾ എന്തുകൊണ്ട്',
+                'who are you': 'നിങ്ങൾ ആരാണ്',
+                'which is': 'ഏതാണ്',
+                'whose is': 'ആരുടെയാണ്',
                 'food': 'ഭക്ഷണം',
                 'house': 'വീട്',
                 'car': 'കാർ',
@@ -445,9 +622,9 @@ def fallback_translation(text, target_language, source_language='English'):
     
     result = ' '.join(translated_words)
     
-    # If no translation was found, return original text
+    # If no translation was found, return a formatted fallback
     if result == text:
-        return text
+        return f"[{target_language}] {text}"
     
     return result
 

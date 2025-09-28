@@ -53,7 +53,7 @@ export default function UsersPage() {
       const username = localStorage.getItem('username')
       if (username) {
         // Use user_login for now to maintain compatibility
-        socket.emit('user_login', { username, language: selectedLanguage || 'English' })
+        socket.emit('user_login', { username, preferredLanguage: selectedLanguage || 'English' })
       }
     })
 

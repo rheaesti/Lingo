@@ -190,6 +190,12 @@ class TranslationService {
           console.log('⚠️ Python script failed, falling back to mock translation');
           result = this.getMockTranslation(text, sourceLanguage, targetLanguage);
         }
+        
+        // If Python script returned original text (no real translation), use mock
+        if (result.translatedText === text) {
+          console.log('⚠️ Python script returned original text, using mock translation instead');
+          result = this.getMockTranslation(text, sourceLanguage, targetLanguage);
+        }
       } else {
         result = this.getMockTranslation(text, sourceLanguage, targetLanguage);
       }
