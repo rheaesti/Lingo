@@ -63,6 +63,8 @@ export default function UsersPage() {
 
     socket.on('login_success', () => {
       // Fetch previous contacts after successful login
+      console.log('🔍 Login successful, requesting previous contacts...')
+      setIsLoadingContacts(true)
       socket.emit('get_previous_contacts')
     })
 
@@ -72,18 +74,15 @@ export default function UsersPage() {
       setContacts(contactsList)
       setIsLoadingContacts(false)
       
-      // If no previous contacts, show online users instead
-      if (contactsList.length === 0) {
-        console.log('🔄 No previous contacts found, switching to online users view')
-        setShowOnlineUsers(true)
-      }
+      // Don't automatically switch to online users - let user choose
+      // The placeholder cards will be shown when contacts.length === 0
     })
 
     socket.on('contacts_error', (error) => {
       console.error('Error fetching contacts:', error)
       setIsLoadingContacts(false)
-      // On error, fallback to online users
-      setShowOnlineUsers(true)
+      // Don't automatically switch to online users on error
+      // Let the user manually choose between tabs
     })
 
     // Handle online users list

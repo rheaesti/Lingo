@@ -21,6 +21,8 @@ export default function ChatPage() {
   const [chatHistory, setChatHistory] = useState([])
   const [selectedLanguage, setSelectedLanguage] = useState('English')
   const [showVirtualKeyboard, setShowVirtualKeyboard] = useState(false)
+  const [receivedMessageIds, setReceivedMessageIds] = useState(new Set())
+  const [receivedMessageKeys, setReceivedMessageKeys] = useState(new Set())
   
   // Initialize translation hook
   const { t, currentLanguage, changeLanguage } = useTranslation(selectedLanguage)
@@ -123,6 +125,41 @@ export default function ChatPage() {
 
     socket.on('private_message', (data) => {
       if (data.from === chatPartner) {
+        // Create a unique key for this message (content + timestamp + sender)
+        const messageKey = `${data.message}|${data.timestamp}|${data.from}`;
+        
+        // Check for duplicate messages using both messageId and messageKey
+        if ((data.messageId && receivedMessageIds.has(data.messageId)) || 
+            receivedMessageKeys.has(messageKey)) {
+          console.log(`⏭️ Skipping duplicate message with ID: ${data.messageId}, Key: ${messageKey}`);
+          return;
+        }
+        
+        // Additional check: Skip messages that are very similar to recent messages
+        const recentMessages = messages.slice(-10); // Check last 10 messages
+        const isDuplicate = recentMessages.some(msg => 
+          msg.message === data.message && 
+          msg.from === data.from && 
+          Math.abs(new Date(msg.timestamp) - new Date(data.timestamp)) < 10000 // Within 10 seconds
+        );
+        
+        if (isDuplicate) {
+          console.log(`⏭️ Skipping duplicate message based on content similarity`);
+          return;
+        }
+        
+        // Additional check: Skip if we already have this exact message in the last 5 messages
+        const exactDuplicate = messages.slice(-5).some(msg => 
+          msg.message === data.message && 
+          msg.from === data.from && 
+          msg.timestamp === data.timestamp
+        );
+        
+        if (exactDuplicate) {
+          console.log(`⏭️ Skipping exact duplicate message`);
+          return;
+        }
+        
         const messageData = {
           ...data,
           type: 'received',
@@ -139,9 +176,17 @@ export default function ChatPage() {
           originalText: data.originalMessage,
           isTranslated: data.isTranslated,
           originalLanguage: data.originalLanguage,
-          translatedLanguage: data.translatedLanguage
+          translatedLanguage: data.translatedLanguage,
+          messageId: data.messageId
         });
         console.log('📥 Final messageData object:', messageData);
+        
+        // Add message ID and key to received sets to prevent duplicates
+        if (data.messageId) {
+          setReceivedMessageIds(prev => new Set(prev).add(data.messageId));
+        }
+        setReceivedMessageKeys(prev => new Set(prev).add(messageKey));
+        
         setMessages(prev => [...prev, messageData])
         
         // Handle offline messages (now handled differently)
@@ -182,6 +227,31 @@ export default function ChatPage() {
     socket.on('chat_history', (payload) => {
       if (payload.with === chatPartner && Array.isArray(payload.messages)) {
         console.log('Received chat history with translation data:', payload.messages);
+        
+        // Track message IDs and keys from chat history to prevent duplicates
+        const historyMessageIds = payload.messages
+          .filter(msg => msg.messageId)
+          .map(msg => msg.messageId);
+        
+        const historyMessageKeys = payload.messages
+          .map(msg => `${msg.message}|${msg.timestamp}|${msg.from || chatPartner}`);
+        
+        if (historyMessageIds.length > 0) {
+          setReceivedMessageIds(prev => {
+            const newSet = new Set(prev);
+            historyMessageIds.forEach(id => newSet.add(id));
+            return newSet;
+          });
+        }
+        
+        if (historyMessageKeys.length > 0) {
+          setReceivedMessageKeys(prev => {
+            const newSet = new Set(prev);
+            historyMessageKeys.forEach(key => newSet.add(key));
+            return newSet;
+          });
+        }
+        
         setMessages(payload.messages)
       }
     })

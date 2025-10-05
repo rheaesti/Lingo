@@ -250,7 +250,8 @@ async function insertMessage(chat_room_id, sender_id, content, translationData =
     chat_room_id,
     sender_id,
     content,
-    message_type: 'text'
+    message_type: 'text',
+    delivered_to_recipient: false  // Track if message was delivered to recipient
   };
   
   // Add translation data if provided
@@ -264,7 +265,7 @@ async function insertMessage(chat_room_id, sender_id, content, translationData =
   const { data, error } = await supabase
     .from('messages')
     .insert(messageData)
-    .select('id, chat_room_id, sender_id, content, translated_content, original_language, translated_language, is_translated, created_at')
+    .select('id, chat_room_id, sender_id, content, translated_content, original_language, translated_language, is_translated, created_at, delivered_to_recipient')
     .single();
   if (error) {
     console.error('insertMessage error', error);
@@ -317,12 +318,30 @@ const usernameToUserId = new Map();
 // Store offline messages for users (username -> [messages])
 const offlineMessages = new Map();
 
+// Track delivered messages to prevent duplicates (userId -> Set of messageIds)
+const deliveredMessages = new Map();
+
+// Alternative deduplication using content + timestamp + sender (more robust)
+const deliveredMessageKeys = new Map();
+
 // Function to deliver offline messages when a user comes online
 async function deliverOfflineMessages(userId, userLanguage, socket) {
   if (!supabase) return;
   
   try {
     console.log(`🔄 Delivering offline messages for user ${userId} (${userLanguage})`);
+    
+    // Initialize delivered messages tracking for this user if not exists
+    if (!deliveredMessages.has(userId)) {
+      deliveredMessages.set(userId, new Set());
+    }
+    const userDeliveredMessages = deliveredMessages.get(userId);
+    
+    // Initialize alternative deduplication tracking
+    if (!deliveredMessageKeys.has(userId)) {
+      deliveredMessageKeys.set(userId, new Set());
+    }
+    const userDeliveredKeys = deliveredMessageKeys.get(userId);
     
     // Get all chat rooms where this user is a participant
     const { data: chatRooms, error: roomsError } = await supabase
@@ -338,12 +357,14 @@ async function deliverOfflineMessages(userId, userLanguage, socket) {
     let hasOfflineMessages = false;
     
     for (const room of chatRooms || []) {
-      // Get recent messages in this room (last 24 hours)
+      // Get recent messages in this room that were NOT delivered to this user
+      // Only get messages from the last 1 hour and check if they were already delivered
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
-        .select('id, content, sender_id, translated_content, original_language, translated_language, is_translated, created_at')
+        .select('id, content, sender_id, translated_content, original_language, translated_language, is_translated, created_at, delivered_to_recipient')
         .eq('chat_room_id', room.id)
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .eq('delivered_to_recipient', false) // Only undelivered messages
+        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Only last 1 hour
         .order('created_at', { ascending: true });
       
       if (messagesError) {
@@ -354,6 +375,22 @@ async function deliverOfflineMessages(userId, userLanguage, socket) {
       for (const message of messages || []) {
         // Skip messages sent by this user (they should see original)
         if (message.sender_id === userId) continue;
+        
+        // Create a unique key for this message (content + timestamp + sender)
+        const messageKey = `${message.content}|${message.created_at}|${message.sender_id}`;
+        
+        // Skip messages that have already been delivered to this user (using both methods)
+        if (userDeliveredMessages.has(message.id) || userDeliveredKeys.has(messageKey)) {
+          console.log(`⏭️ Skipping already delivered message ${message.id} (key: ${messageKey}) to user ${userId}`);
+          continue;
+        }
+        
+        // Additional check: Skip very recent messages (less than 30 seconds old) as they were likely delivered online
+        const messageAge = Date.now() - new Date(message.created_at).getTime();
+        if (messageAge < 30000) { // 30 seconds
+          console.log(`⏭️ Skipping recent message ${message.id} (${messageAge}ms old) - likely delivered online`);
+          continue;
+        }
         
         hasOfflineMessages = true;
         
@@ -426,10 +463,21 @@ async function deliverOfflineMessages(userId, userLanguage, socket) {
           originalLanguage: senderLanguage,
           translatedLanguage: userLanguage,
           isTranslated: isTranslated,
-          timestamp: message.created_at || new Date().toISOString()
+          timestamp: message.created_at || new Date().toISOString(),
+          messageId: message.id  // Add message ID for client-side deduplication
         });
         
-        console.log(`📬 Delivered offline message: "${originalText}" → "${displayText}"`);
+        // Mark this message as delivered to this user (using both methods)
+        userDeliveredMessages.add(message.id);
+        userDeliveredKeys.add(messageKey);
+        
+        // Mark message as delivered in database
+        await supabase
+          .from('messages')
+          .update({ delivered_to_recipient: true })
+          .eq('id', message.id);
+        
+        console.log(`📬 Delivered offline message: "${originalText}" → "${displayText}" (ID: ${message.id}, Key: ${messageKey})`);
       }
     }
     
@@ -777,8 +825,32 @@ io.on('connection', (socket) => {
         originalLanguage: senderLanguage,
         translatedLanguage: recipientLanguage,
         isTranslated: senderLanguage !== recipientLanguage,
-        timestamp: persisted.created_at || new Date().toISOString()
+        timestamp: persisted.created_at || new Date().toISOString(),
+        messageId: persisted.id  // Add message ID for client-side deduplication
       });
+      
+      // Track this message as delivered to the recipient (mark as delivered online)
+      const recipientUserId = usernameToUserId.get(to);
+      if (recipientUserId) {
+        if (!deliveredMessages.has(recipientUserId)) {
+          deliveredMessages.set(recipientUserId, new Set());
+        }
+        if (!deliveredMessageKeys.has(recipientUserId)) {
+          deliveredMessageKeys.set(recipientUserId, new Set());
+        }
+        
+        const messageKey = `${message}|${persisted.created_at}|${sender.userId}`;
+        deliveredMessages.get(recipientUserId).add(persisted.id);
+        deliveredMessageKeys.get(recipientUserId).add(messageKey);
+        
+        // Mark message as delivered in database
+        await supabase
+          .from('messages')
+          .update({ delivered_to_recipient: true })
+          .eq('id', persisted.id);
+        
+        console.log(`✅ Marked message ${persisted.id} as delivered online to user ${recipientUserId}`);
+      }
     }
 
     // Send confirmation to sender (original message)
@@ -867,7 +939,8 @@ io.on('connection', (socket) => {
         type: isReceived ? 'received' : 'sent',
         isTranslated: isTranslated,
         originalLanguage: originalLanguage,
-        translatedLanguage: translatedLanguage
+        translatedLanguage: translatedLanguage,
+        messageId: r.id  // Add message ID for client-side deduplication
       };
     });
     
@@ -992,6 +1065,12 @@ io.on('connection', (socket) => {
       // Remove user from connected users
       connectedUsers.delete(socket.id);
       usernames.delete(username);
+
+      // Clean up delivered messages tracking for this user
+      if (userId) {
+        deliveredMessages.delete(userId);
+        deliveredMessageKeys.delete(userId);
+      }
 
       // Mark offline in DB (best-effort)
       if (supabase && userId) {
