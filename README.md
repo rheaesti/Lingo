@@ -228,4 +228,5 @@ lingo/
 - Clean, modern interface inspired by WhatsApp Web.
 - Responsive design for mobile and desktop.
 - Smooth animations and transitions.
-- Loading states and error handling.
+- Loading states and error handling.#   c h a t - t r a n s l a t i o n  
+ 
